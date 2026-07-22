@@ -1,0 +1,8 @@
+[
+  {
+    "songId": "mock-001",
+    "jacketUrl": "https://example.com/path/to/cover.webp",
+    "previewUrl": "https://example.com/path/to/30s-preview.mp3",
+    "licenseNote": "Example only. Replace with source/permission note before importing."
+  }
+]

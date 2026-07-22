@@ -1,0 +1,27 @@
+services:
+  maimai-music-cup:
+    build: .
+    container_name: maimai-music-cup
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-18080}:80"
+
+  asset-importer:
+    image: node:20-alpine
+    profiles:
+      - tools
+    working_dir: /app
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - .:/app
+    command: ["node", "scripts/import-assets.mjs"]
+
+  cn-song-importer:
+    image: node:20-alpine
+    profiles:
+      - tools
+    working_dir: /app
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - .:/app
+    command: ["node", "scripts/import-cn-songs.mjs", "--download-covers", "--github-covers"]
