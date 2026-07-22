@@ -37,7 +37,7 @@ const defaultFilters: CupFilters = {
   difficulties: ["Expert", "Master", "Re:Master"],
   minLevel: "1",
   maxLevel: "15",
-  seed: "maimai-cup"
+  seed: randomSeed()
 };
 
 export default function App() {
@@ -394,14 +394,23 @@ export default function App() {
               </>
             ) : null}
 
-            <label className="seed-field">
-              随机种子
-              <input
-                value={filters.seed}
-                onChange={(event) => setFilters({ ...filters, seed: event.target.value })}
-                placeholder="输入任意文字可复现抽签"
-              />
-            </label>
+            <details className="advanced-block">
+              <summary>高级 · 随机种子</summary>
+              <label className="seed-field">
+                默认已随机；填入相同种子可复现同一届抽签
+                <div className="seed-row">
+                  <input
+                    value={filters.seed}
+                    onChange={(event) => setFilters({ ...filters, seed: event.target.value })}
+                    placeholder="例如 maimai-cup"
+                  />
+                  <button type="button" className="ghost-action" onClick={() => setFilters({ ...filters, seed: randomSeed() })}>
+                    <Dices size={16} />
+                    随机
+                  </button>
+                </div>
+              </label>
+            </details>
 
             <button className="primary-action" onClick={() => startDraw()} disabled={!canStart}>
               <Dices size={20} />
@@ -555,6 +564,7 @@ export default function App() {
             championPath={championPath}
             history={history}
             modeLabel={modeLabel}
+            seed={filters.seed}
           />
           <div className="result-actions">
             <button className="primary-inline" onClick={downloadShareImage}>
@@ -622,7 +632,8 @@ function SharePoster({
   topFour,
   championPath,
   history,
-  modeLabel
+  modeLabel,
+  seed
 }: {
   captureRef: RefObject<HTMLDivElement>;
   champion: CupEntry;
@@ -631,12 +642,14 @@ function SharePoster({
   championPath: MatchRecord[];
   history: MatchRecord[];
   modeLabel: string;
+  seed: string;
 }) {
   return (
     <div className="share-poster" ref={captureRef}>
       <div className="poster-header">
         <p>MAIMAI CUP</p>
         <h2>{modeLabel} · 舞萌本命之巅</h2>
+        <span className="poster-seed">SEED · {seed || "maimai-cup"}</span>
       </div>
 
       <div className="poster-layout">

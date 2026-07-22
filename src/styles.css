@@ -1991,3 +1991,54 @@ button:not(:disabled):hover,
     display: none;
   }
 }
+
+.advanced-block {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.advanced-block summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 800;
+  font-size: 0.86rem;
+  list-style: none;
+}
+
+.advanced-block summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-block summary::before {
+  content: "▸ ";
+  color: var(--sakura);
+}
+
+.advanced-block[open] summary::before {
+  content: "▾ ";
+}
+
+.seed-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.seed-row input {
+  margin-top: 0;
+}
+
+.seed-row button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.poster-seed {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--sakura);
+  font-weight: 900;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+}
