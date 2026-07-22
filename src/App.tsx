@@ -683,7 +683,7 @@ function SharePoster({
 }
 
 function BracketSide({ side, history, champion }: { side: "left" | "right"; history: MatchRecord[]; champion: CupEntry }) {
-  const rounds = side === "left" ? ["8 强", "半决赛"] : ["半决赛", "8 强"];
+  const rounds = side === "left" ? ["32 强", "16 强", "8 强", "半决赛"] : ["半决赛", "8 强", "16 强", "32 强"];
   return (
     <div className={`poster-bracket poster-bracket-${side}`}>
       {rounds.map((round) => {

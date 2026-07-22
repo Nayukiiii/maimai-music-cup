@@ -967,22 +967,22 @@ button:not(:disabled):hover,
 
 .poster-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.85fr) minmax(0, 1.1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.18fr) minmax(260px, 0.82fr) minmax(0, 1.18fr);
+  gap: 14px;
   align-items: center;
 }
 
 .poster-bracket {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
 .poster-round {
   display: grid;
   align-content: center;
-  gap: 8px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -996,29 +996,29 @@ button:not(:disabled):hover,
 .poster-match {
   position: relative;
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 5px;
+  border-radius: 7px;
+  padding: 4px;
   background: rgba(255, 255, 255, 0.055);
 }
 
 .poster-match::after {
   position: absolute;
   top: 50%;
-  width: 10px;
+  width: 8px;
   height: 1px;
   content: "";
   background: rgba(255, 158, 199, 0.6);
 }
 
 .poster-bracket-left .poster-match::after {
-  right: -10px;
+  right: -8px;
 }
 
 .poster-bracket-right .poster-match::after {
-  left: -10px;
+  left: -8px;
 }
 
 .poster-match.champion-line {
@@ -1028,8 +1028,8 @@ button:not(:disabled):hover,
 
 .mini-entry {
   display: grid;
-  grid-template-columns: 24px 1fr;
-  gap: 6px;
+  grid-template-columns: 20px 1fr;
+  gap: 5px;
   align-items: center;
   min-width: 0;
   opacity: 0.42;
@@ -1040,9 +1040,9 @@ button:not(:disabled):hover,
 }
 
 .mini-entry img {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   object-fit: cover;
 }
 
@@ -1052,7 +1052,7 @@ button:not(:disabled):hover,
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 950;
 }
 
