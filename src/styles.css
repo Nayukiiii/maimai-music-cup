@@ -3492,3 +3492,349 @@ h1 {
     flex-basis: calc(50% - 8px);
   }
 }
+
+/* Mobile tournament stage: keep both choices visible and make results readable. */
+.mobile-bracket-details {
+  display: none;
+}
+
+.share-poster.capture-mode .mobile-bracket-details {
+  display: none !important;
+}
+
+@media (max-width: 520px) {
+  body {
+    padding-bottom: calc(30px + env(safe-area-inset-bottom));
+  }
+
+  .app-shell {
+    padding: 10px;
+  }
+
+  .bracket-panel,
+  .result-stage {
+    padding: 10px;
+  }
+
+  .bracket-panel .stage-header {
+    gap: 9px;
+  }
+
+  .bracket-panel .stage-header p {
+    margin-top: 6px;
+    font-size: 0.76rem;
+  }
+
+  .round-roadmap {
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .round-roadmap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .round-roadmap > div {
+    min-width: 62px;
+    padding: 7px 5px;
+  }
+
+  .duel-zone {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-items: start;
+    padding-top: 2px;
+  }
+
+  .duel-slot.side-1,
+  .duel-slot.side-2 {
+    order: initial;
+  }
+
+  .duel-zone .vs-badge {
+    position: absolute;
+    left: 50%;
+    top: min(23vw, 92px);
+    order: initial;
+    width: 40px;
+    height: 40px;
+    border-width: 1px;
+    font-size: 0.7rem;
+    transform: translate(-50%, -50%);
+    animation: vs-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .duel-zone .song-card.duel {
+    gap: 6px;
+    min-height: 0;
+    border-radius: 12px;
+    padding: 7px;
+  }
+
+  .duel-zone .song-card.duel .title-line,
+  .duel-zone .song-card.duel .artist-line {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+  }
+
+  .duel-zone .song-card.duel .title-line {
+    min-height: 2.2em;
+    font-size: 0.86rem;
+    line-height: 1.1;
+    -webkit-line-clamp: 2;
+  }
+
+  .duel-zone .song-card.duel .artist-line {
+    font-size: 0.68rem;
+    line-height: 1.15;
+    -webkit-line-clamp: 2;
+  }
+
+  .duel-zone .tag-row {
+    gap: 4px;
+  }
+
+  .duel-zone .pill,
+  .duel-zone .difficulty,
+  .duel-zone .chart-stat,
+  .duel-zone .designer,
+  .duel-zone .chart-constant {
+    min-height: 22px;
+    padding: 4px 6px;
+    font-size: 0.58rem;
+  }
+
+  .duel-zone .song-stats {
+    display: none;
+  }
+
+  .duel-zone .audio-preview {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .duel-zone .audio-preview > span {
+    font-size: 0.6rem;
+  }
+
+  .duel-zone .audio-preview audio {
+    height: 28px;
+  }
+
+  .share-poster {
+    padding: 12px;
+    border-radius: 13px;
+  }
+
+  .share-poster .poster-header {
+    margin-bottom: 14px;
+    text-align: center;
+  }
+
+  .share-poster .poster-kicker,
+  .share-poster .poster-domain {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .share-poster .poster-kicker {
+    gap: 8px;
+    margin-bottom: 9px;
+    font-size: 0.56rem;
+    letter-spacing: 0.11em;
+  }
+
+  .share-poster .poster-header p {
+    margin-bottom: 3px;
+    font-size: 1.02rem;
+  }
+
+  .share-poster .poster-header h2 {
+    justify-content: center;
+    font-size: 1.35rem;
+  }
+
+  .share-poster .poster-meta-line {
+    gap: 5px 10px;
+    justify-content: center;
+    margin-top: 7px;
+    font-size: 0.62rem;
+  }
+
+  .share-poster .poster-layout {
+    display: block;
+  }
+
+  .share-poster .poster-layout > .poster-bracket {
+    display: none;
+  }
+
+  .share-poster .poster-champion {
+    order: 0;
+  }
+
+  .share-poster .champion-art {
+    width: min(176px, 52vw);
+    height: min(176px, 52vw);
+    padding: 4px;
+  }
+
+  .share-poster .champion-crown {
+    right: -8px;
+    top: -10px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .share-poster .champion-ribbon {
+    margin-top: 11px;
+    padding: 7px 15px;
+    font-size: 0.74rem;
+  }
+
+  .share-poster .poster-champion h3 {
+    margin: 10px 0 4px;
+    font-size: 1.3rem;
+  }
+
+  .share-poster .poster-champion p {
+    font-size: 0.78rem;
+  }
+
+  .share-poster .champion-chart {
+    margin-top: 7px;
+    padding: 5px 9px;
+    font-size: 0.66rem;
+  }
+
+  .share-poster .runner-up {
+    margin-top: 8px;
+    padding: 5px 8px 5px 5px;
+  }
+
+  .share-poster .runner-up img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .share-poster .poster-footer {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 12px;
+  }
+
+  .share-poster .poster-topfour,
+  .share-poster .poster-path {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .share-poster .poster-topfour > span,
+  .share-poster .poster-path > span {
+    grid-column: 1 / -1;
+  }
+
+  .share-poster .poster-finisher,
+  .share-poster .poster-path b {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .mobile-bracket-details {
+    display: block;
+    margin-top: 14px;
+    border: 1px solid rgba(102, 230, 239, 0.2);
+    border-radius: 10px;
+    padding: 10px;
+    background: rgba(8, 12, 28, 0.62);
+  }
+
+  .mobile-bracket-details summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #e9faff;
+    cursor: pointer;
+    font-size: 0.76rem;
+    font-weight: 950;
+    list-style: none;
+  }
+
+  .mobile-bracket-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-bracket-details summary b {
+    color: var(--cyan);
+    font-size: 0.64rem;
+  }
+
+  .mobile-bracket-details[open] summary b::after {
+    content: " · 收起";
+  }
+
+  .mobile-bracket-details > p {
+    margin: 7px 0 10px;
+    color: #8091a8;
+    font-size: 0.62rem;
+  }
+
+  .mobile-bracket-scroll {
+    display: grid;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 2px 2px 8px;
+    scrollbar-color: rgba(102, 230, 239, 0.45) transparent;
+  }
+
+  .mobile-bracket-scroll .poster-bracket {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(126px, 1fr));
+    width: 560px;
+  }
+
+  .mobile-bracket-scroll .poster-round-name {
+    text-align: center;
+  }
+
+  .mobile-bracket-scroll .poster-match::after {
+    display: block;
+  }
+
+  .share-poster .poster-domain {
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 9px;
+    font-size: 0.53rem;
+    letter-spacing: 0.06em;
+  }
+
+  .result-actions {
+    position: sticky;
+    bottom: calc(6px + env(safe-area-inset-bottom));
+    z-index: 4;
+    gap: 8px;
+    margin-top: 12px;
+    border: 1px solid rgba(102, 230, 239, 0.18);
+    border-radius: 12px;
+    padding: 8px;
+    background: rgba(8, 10, 23, 0.9);
+    backdrop-filter: blur(14px);
+  }
+
+  .result-actions > button {
+    width: auto;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 0.7rem;
+  }
+}

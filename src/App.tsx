@@ -846,6 +846,19 @@ function SharePoster({
           ))}
         </div>
       </div>
+
+      <details className="mobile-bracket-details">
+        <summary>
+          <span>完整 32 强晋级表</span>
+          <b>展开查看</b>
+        </summary>
+        <p>左右滑动可查看每轮对阵与晋级结果</p>
+        <div className="mobile-bracket-scroll">
+          <BracketSide side="left" history={history} champion={champion} />
+          <BracketSide side="right" history={history} champion={champion} />
+        </div>
+      </details>
+
       <div className="poster-domain"><span>MAIMAI MUSIC TOURNAMENT</span><b>maimai.utautai.org</b></div>
     </div>
   );
