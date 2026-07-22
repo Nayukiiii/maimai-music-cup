@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     ports:
       - "${APP_PORT:-18080}:80"
+    volumes:
+      - ./deploy/.htpasswd:/etc/nginx/.htpasswd:ro
 
   asset-importer:
     image: node:20-alpine

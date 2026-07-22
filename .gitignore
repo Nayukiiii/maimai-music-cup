@@ -1,8 +1,12 @@
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
 .env
 .env.*
 asset-sources.json
+deploy/.htpasswd
 npm-debug.log*
 .DS_Store
+vite.config.d.ts
+vite.config.js

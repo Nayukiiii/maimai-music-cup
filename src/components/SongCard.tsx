@@ -1,6 +1,8 @@
 import { Check, Disc3, Gauge, Sparkles, Volume2 } from "lucide-react";
 import type { KeyboardEvent } from "react";
+import { getYouTubeSource } from "../data/youtube";
 import { CupEntry } from "../types";
+import { YouTubePreview } from "./YouTubePreview";
 
 const difficultyClass: Record<string, string> = {
   Basic: "basic",
@@ -19,9 +21,17 @@ interface SongCardProps {
   onSelect?: (entry: CupEntry) => void;
 }
 
+const PLACEHOLDER_DESIGNERS = new Set(["maimainet", ""]);
+
 export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel, onSelect }: SongCardProps) {
   const clickable = Boolean(onSelect) && !disabled;
   const difficulty = entry.chart?.difficulty;
+  const designer = entry.chart?.designer?.trim();
+  const showDesigner = Boolean(designer) && !PLACEHOLDER_DESIGNERS.has(designer!.toLowerCase());
+  const chartType = entry.chart?.type;
+  const showType = Boolean(chartType) && chartType !== "dx";
+  const showBpm = Boolean(entry.bpm) && entry.bpm > 0;
+  const ytSource = getYouTubeSource(entry.songId);
 
   return (
     <article
@@ -34,7 +44,7 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
       onKeyDown={(event) => handleKeyDown(event, clickable, () => onSelect?.(entry))}
     >
       <span className="jacket-wrap">
-        <img src={entry.jacket} alt={`${entry.title} jacket`} className="jacket" />
+        <img src={entry.jacket} alt={`${entry.title} jacket`} className="jacket" loading="lazy" />
         {selected ? (
           <span className="selected-mark">
             <Check size={18} />
@@ -62,15 +72,17 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
           <span className="chart-stat">
             <Gauge size={14} />
             Lv {entry.chart.level}
-            {entry.chart.type ? ` / ${entry.chart.type.toUpperCase()}` : ""}
+            {showType ? ` / ${chartType!.toUpperCase()}` : ""}
           </span>
-          <span className="designer">
-            <Sparkles size={14} />
-            {entry.chart.designer}
-          </span>
+          {showDesigner ? (
+            <span className="designer">
+              <Sparkles size={14} />
+              {designer}
+            </span>
+          ) : null}
         </span>
       ) : (
-        <span className="song-stats">BPM {entry.bpm}</span>
+        <span className="song-stats">{showBpm ? `BPM ${entry.bpm}` : `${entry.category} · ${entry.version}`}</span>
       )}
 
       {entry.previewAudio ? (
@@ -82,6 +94,8 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
           <audio controls preload="none" src={entry.previewAudio} />
         </span>
       ) : null}
+
+      {ytSource && mode !== "compact" ? <YouTubePreview source={ytSource} title={entry.title} /> : null}
     </article>
   );
 }

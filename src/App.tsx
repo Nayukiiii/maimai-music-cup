@@ -14,13 +14,20 @@ import {
   Zap
 } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SongCard } from "./components/SongCard";
 import { songs, usingImportedSongs } from "./data/songs";
 import { compareLevel, getRoundName, makeGroups, shuffleWithSeed, toCupEntries } from "./lib/tournament";
 import { CupEntry, CupFilters, Difficulty, MatchRecord } from "./types";
 
 type Phase = "config" | "draw" | "groups" | "revival" | "bracket" | "result";
+
+type BracketSnapshot = {
+  roundEntries: CupEntry[];
+  roundWinners: CupEntry[];
+  matchIndex: number;
+  history: MatchRecord[];
+};
 
 const difficulties: Difficulty[] = ["Basic", "Advanced", "Expert", "Master", "Re:Master"];
 const defaultFilters: CupFilters = {
@@ -47,6 +54,7 @@ export default function App() {
   const [matchIndex, setMatchIndex] = useState(0);
   const [history, setHistory] = useState<MatchRecord[]>([]);
   const [champion, setChampion] = useState<CupEntry | null>(null);
+  const [undoStack, setUndoStack] = useState<BracketSnapshot[]>([]);
   const resultRef = useRef<HTMLDivElement>(null);
 
   const categories = useMemo(() => unique(songs.map((song) => song.category)), []);
@@ -55,6 +63,16 @@ export default function App() {
     () => unique(songs.flatMap((song) => song.charts.map((chart) => chart.level))).sort(compareLevel),
     []
   );
+  useEffect(() => {
+    if (!levelOptions.length) return;
+    const first = levelOptions[0];
+    const last = levelOptions[levelOptions.length - 1];
+    setFilters((current) =>
+      levelOptions.includes(current.minLevel) && levelOptions.includes(current.maxLevel)
+        ? current
+        : { ...current, minLevel: first, maxLevel: last }
+    );
+  }, [levelOptions]);
   const pool = useMemo(() => toCupEntries(songs, filters), [filters]);
   const uniquePoolSongs = useMemo(() => new Set(pool.map((entry) => entry.songId)).size, [pool]);
   const canStart = uniquePoolSongs >= 48;
@@ -62,7 +80,7 @@ export default function App() {
   const difficultyModeText =
     filters.mode === "chart" ? `${filters.difficulties[0] ?? "Expert"} / Lv ${filters.minLevel}-${filters.maxLevel}` : "分类与版本";
   const cupMeta = `${modeLabel} / ${usingImportedSongs ? "CN 曲库" : "Mock 曲库"} / Seed ${filters.seed || "maimai-cup"}`;
-  const transitionKey = `${phase}-${groupIndex}-${roundEntries.length}-${matchIndex}-${champion?.id ?? "none"}`;
+  const transitionKey = `${phase}-${roundEntries.length}`;
   const currentGroup = groups[groupIndex] ?? [];
   const currentRoundName = getRoundName(roundEntries.length);
   const currentMatch = [roundEntries[matchIndex * 2], roundEntries[matchIndex * 2 + 1]].filter(isEntry);
@@ -94,6 +112,7 @@ export default function App() {
     setMatchIndex(0);
     setHistory([]);
     setChampion(null);
+    setUndoStack([]);
     setPhase("draw");
   }
 
@@ -158,6 +177,7 @@ export default function App() {
     setRoundWinners([]);
     setMatchIndex(0);
     setHistory([]);
+    setUndoStack([]);
     setPhase("bracket");
   }
 
@@ -165,6 +185,7 @@ export default function App() {
     if (currentMatch.length < 2) {
       return;
     }
+    setUndoStack((stack) => [...stack, { roundEntries, roundWinners, matchIndex, history }]);
     const [left, right] = currentMatch;
     const loser = left.id === winner.id ? right : left;
     const matchRecord: MatchRecord = {
@@ -194,13 +215,29 @@ export default function App() {
     setMatchIndex(0);
   }
 
+  function undoLastMatch() {
+    setUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const prev = stack[stack.length - 1];
+      setRoundEntries(prev.roundEntries);
+      setRoundWinners(prev.roundWinners);
+      setMatchIndex(prev.matchIndex);
+      setHistory(prev.history);
+      setChampion(null);
+      setPhase("bracket");
+      return stack.slice(0, -1);
+    });
+  }
+
   async function downloadShareImage() {
     if (!resultRef.current) {
       return;
     }
     const canvas = await html2canvas(resultRef.current, {
-      backgroundColor: "#05070d",
-      scale: Math.min(window.devicePixelRatio || 2, 3)
+      backgroundColor: "#130810",
+      scale: Math.min(window.devicePixelRatio || 2, 3),
+      useCORS: true,
+      logging: false
     });
     const link = document.createElement("a");
     link.download = `maimai-cup-${champion?.title ?? "result"}.png`;
@@ -221,6 +258,7 @@ export default function App() {
     setMatchIndex(0);
     setHistory([]);
     setChampion(null);
+    setUndoStack([]);
   }
 
   return (
@@ -242,6 +280,7 @@ export default function App() {
       </div>
 
       <div className="phase-stage" key={transitionKey}>
+        <StageIntro intro={getStageIntro(phase, roundEntries.length)} />
         {phase === "config" ? (
         <section className="config-layout phase-panel config-panel">
           <div className="control-surface">
@@ -269,6 +308,12 @@ export default function App() {
                 谱面杯
               </button>
             </div>
+
+            <p className="filter-hint mode-desc">
+              {filters.mode === "song"
+                ? "歌曲杯：以「一首歌」为参赛单位，不区分谱面难度。"
+                : "谱面杯：以「歌 + 单一难度谱面」参赛，整届固定同难度对决。"}
+            </p>
 
             <FilterBlock title="分类">
               {categories.map((category) => (
@@ -480,6 +525,12 @@ export default function App() {
             title={`${modeLabel} / ${currentRoundName} / MATCH ${matchIndex + 1}`}
             subtitle={`本轮 ${matchIndex + 1} / ${roundEntries.length / 2} 场，累计完成 ${history.length} 场。`}
             meta={cupMeta}
+            actions={
+              <button className="ghost-action" onClick={undoLastMatch} disabled={undoStack.length === 0}>
+                <RotateCcw size={17} />
+                撤销上一场
+              </button>
+            }
           />
           <ProgressBar value={matchIndex} max={roundEntries.length / 2} />
           <div className="duel-zone">
@@ -550,6 +601,20 @@ function StageHeader({
   );
 }
 
+function StageIntro({ intro }: { intro: ReturnType<typeof getStageIntro> }) {
+  if (!intro) return null;
+
+  return (
+    <div className={`stage-intro intro-${intro.variant}`} key={intro.key} aria-hidden="true">
+      <div className="stage-intro-inner">
+        <span className="stage-intro-en">{intro.en}</span>
+        <strong className="stage-intro-title">{intro.title}</strong>
+        <span className="stage-intro-desc">{intro.desc}</span>
+      </div>
+    </div>
+  );
+}
+
 function SharePoster({
   captureRef,
   champion,
@@ -589,7 +654,8 @@ function SharePoster({
           <p>{champion.artist}</p>
           {champion.chart ? (
             <div className="champion-chart">
-              {champion.chart.difficulty} / Lv {champion.chart.level} / {champion.chart.type?.toUpperCase() ?? "CHART"}
+              {champion.chart.difficulty} / Lv {champion.chart.level}
+              {champion.chart.type && champion.chart.type !== "dx" ? ` / ${champion.chart.type.toUpperCase()}` : ""}
             </div>
           ) : null}
           {runnerUp ? <div className="runner-up">亚军 / {runnerUp.title}</div> : null}
@@ -617,7 +683,7 @@ function SharePoster({
 }
 
 function BracketSide({ side, history, champion }: { side: "left" | "right"; history: MatchRecord[]; champion: CupEntry }) {
-  const rounds = side === "left" ? ["32 强", "16 强", "8 强", "半决赛"] : ["半决赛", "8 强", "16 强", "32 强"];
+  const rounds = side === "left" ? ["8 强", "半决赛"] : ["半决赛", "8 强"];
   return (
     <div className={`poster-bracket poster-bracket-${side}`}>
       {rounds.map((round) => {
@@ -742,4 +808,41 @@ function phaseLabel(phase: Phase) {
 
 function cupModeLabel(mode: CupFilters["mode"]) {
   return mode === "song" ? "歌曲杯" : "谱面杯";
+}
+
+type IntroVariant = "normal" | "semi" | "final" | "champion";
+
+function getStageIntro(
+  phase: Phase,
+  roundSize: number
+): { key: string; en: string; title: string; desc: string; variant: IntroVariant } | null {
+  if (phase === "draw") {
+    return { key: "draw", en: "DRAW", title: "抽签", desc: "48 首本命随机分入 12 组，同一首歌不会重复出现。", variant: "normal" };
+  }
+  if (phase === "groups") {
+    return { key: "groups", en: "GROUP STAGE", title: "小组赛", desc: "每组 4 首，你选 2 首直通，另外 2 首落入待复活区。", variant: "normal" };
+  }
+  if (phase === "revival") {
+    return { key: "revival", en: "REVIVAL", title: "复活赛", desc: "从落选的 24 首里捞回 8 首，凑齐 32 强。", variant: "normal" };
+  }
+  if (phase === "result") {
+    return { key: "result", en: "CHAMPION", title: "冠军诞生", desc: "这就是你的年度本命之巅，截图分享给同好。", variant: "champion" };
+  }
+  if (phase === "bracket") {
+    switch (roundSize) {
+      case 32:
+        return { key: "r32", en: "ROUND OF 32", title: "32 强", desc: "单败淘汰开始，每场只有一首能活下来。", variant: "normal" };
+      case 16:
+        return { key: "r16", en: "ROUND OF 16", title: "16 强", desc: "半数出局，你的本命还在名单里吗？", variant: "normal" };
+      case 8:
+        return { key: "r8", en: "QUARTER FINAL", title: "8 强", desc: "只剩八首，每一票都在改写结局。", variant: "normal" };
+      case 4:
+        return { key: "r4", en: "SEMI FINAL", title: "半决赛", desc: "四进二，决赛门票近在眼前。", variant: "semi" };
+      case 2:
+        return { key: "r2", en: "FINAL", title: "决赛", desc: "最后两首，选出你的本命之巅。", variant: "final" };
+      default:
+        return { key: `r${roundSize}`, en: "BATTLE", title: `${roundSize} 强`, desc: "选出你更爱的一首。", variant: "normal" };
+    }
+  }
+  return null;
 }

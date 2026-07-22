@@ -1,6 +1,6 @@
 # MAIMAI CUP / 舞萌本命之巅
 
-一个静态 SPA 版 maimai 风格 MUSIC CUP MVP。当前版本使用本地 mock 曲库，无账号、无数据库、无真实音频、无外部 API，适合先快速部署到 ORACLE-ARM / OCI。
+一个静态 SPA 版 maimai 风格 MUSIC CUP MVP。当前版本使用本地曲库，无账号、无数据库、不抽取或转存音频，适合先快速部署到 ORACLE-ARM / OCI。
 
 ## 功能
 
@@ -11,6 +11,8 @@
 - 复活赛：24 个落选项中选 8 个，组成 32 强。
 - 淘汰赛：32 强、16 强、8 强、半决赛、决赛。
 - 结果页：冠军、亚军、四强、冠军晋级路径、生成分享 PNG。
+- YouTube 试听：只在用户点击「试听」时挂载官方 `youtube-nocookie.com` iframe。
+- 私密 Admin：`/admin` 使用 Nginx Basic Auth，支持本地编辑 YouTube 链接并导出构建期 JSON。
 
 ## 本地开发
 
@@ -70,7 +72,57 @@ src/data/mockSongs.ts
 
 ## 音频和封面资产方案
 
-不要把未授权的完整音频或官方曲绘直接打包发布。推荐用“静态资产包”：
+不要把未授权的完整音频或官方曲绘直接打包发布。封面当前可以使用本地缓存资源；试听推荐使用官方 iframe 嵌入或你有权发布的短片段。
+
+### YouTube 试听源
+
+公开站读取构建期文件：
+
+```text
+src/data/youtubeSources.json
+```
+
+格式按 `songId` 归属，歌曲杯和谱面杯共用同一首歌的试听源：
+
+```json
+{
+  "song-id": {
+    "videoId": "YouTube视频ID",
+    "start": 30
+  }
+}
+```
+
+合规边界：本站只使用 YouTube 官方 iframe 嵌入播放器，不做任何音频抽取、下载、转存。页面初次加载不会请求 YouTube，只有点击卡片里的「试听」才会挂载 iframe。
+
+### Admin 管理页
+
+`/admin` 是一个本地编辑器入口，由 Nginx Basic Auth 保护。它不会直接修改线上数据，改动先存在当前浏览器的 `localStorage` 草稿里，点击「导出」后下载 `youtubeSources.json`，再覆盖 `src/data/youtubeSources.json` 并重新构建部署。
+
+部署前先生成 admin 口令文件：
+
+```bash
+docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'CHANGE_ME_STRONG_PASSWORD' > deploy/.htpasswd
+chmod 644 deploy/.htpasswd
+docker compose up -d --build
+```
+
+然后访问：
+
+```text
+http://你的域名/admin
+```
+
+输入 `admin` 和你设置的密码。没有 `deploy/.htpasswd` 时 Nginx 容器会启动失败；建议只在 HTTPS 域名下使用 `/admin`，否则 Basic Auth 密码会明文传输。
+
+导出后生效流程：
+
+```bash
+# 用浏览器导出的文件覆盖 src/data/youtubeSources.json
+docker compose up -d --build
+```
+
+如果你有可发布的静态试听片段，也可以继续使用“静态资产包”：
 
 - 封面：放到 `public/assets/jackets/`，建议 `webp`，尺寸 512x512 或 768x768。
 - 试听：放到 `public/assets/previews/`，建议 15-30 秒 `mp3/aac` 片段。
