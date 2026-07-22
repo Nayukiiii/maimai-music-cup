@@ -1201,14 +1201,14 @@ button:not(:disabled):hover,
   max-width: min(520px, 92%);
   border: 1px solid rgba(255, 158, 199, 0.35);
   border-radius: 16px;
-  padding: 26px 34px;
+  padding: 30px 38px;
   text-align: center;
   background: linear-gradient(160deg, rgba(40, 18, 30, 0.88), rgba(20, 10, 18, 0.84));
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(10px);
   box-shadow:
     0 24px 70px rgba(18, 2, 12, 0.5),
     0 0 40px rgba(255, 93, 143, 0.2);
-  animation: stage-intro 1700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: stage-intro 3600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .stage-intro-en {
@@ -1232,8 +1232,8 @@ button:not(:disabled):hover,
 
 .stage-intro-desc {
   display: block;
-  color: var(--text-muted);
-  font-size: 0.92rem;
+  color: #ffe1ee;
+  font-size: clamp(0.95rem, 2vw, 1.08rem);
   font-weight: 800;
 }
 
@@ -1268,7 +1268,7 @@ button:not(:disabled):hover,
   box-shadow:
     0 24px 80px rgba(18, 2, 12, 0.55),
     0 0 60px rgba(255, 212, 121, 0.3);
-  animation-duration: 2200ms;
+  animation-duration: 4600ms;
   animation-name: stage-intro-champion;
 }
 
@@ -1667,12 +1667,12 @@ button:not(:disabled):hover,
     transform: translateY(18px) scale(0.9);
     filter: blur(8px);
   }
-  16% {
+  10% {
     opacity: 1;
     transform: translateY(0) scale(1);
     filter: blur(0);
   }
-  70% {
+  82% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -1688,11 +1688,11 @@ button:not(:disabled):hover,
     opacity: 0;
     transform: perspective(700px) rotateX(30deg) translateY(20px);
   }
-  18% {
+  12% {
     opacity: 1;
     transform: perspective(700px) rotateX(0deg) translateY(0);
   }
-  70% {
+  82% {
     opacity: 1;
   }
   100% {
@@ -1708,15 +1708,15 @@ button:not(:disabled):hover,
     transform: scale(0.5);
     filter: blur(10px);
   }
-  22% {
+  12% {
     opacity: 1;
     transform: scale(1.08);
     filter: blur(0);
   }
-  32% {
+  18% {
     transform: scale(1);
   }
-  72% {
+  84% {
     opacity: 1;
     transform: scale(1);
   }
@@ -1733,15 +1733,15 @@ button:not(:disabled):hover,
     transform: translateY(24px) scale(0.7);
     filter: blur(12px);
   }
-  20% {
+  12% {
     opacity: 1;
     transform: translateY(0) scale(1.06);
     filter: blur(0);
   }
-  30% {
+  18% {
     transform: scale(1);
   }
-  80% {
+  86% {
     opacity: 1;
     transform: scale(1);
   }
