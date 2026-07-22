@@ -1,7 +1,7 @@
-import html2canvas from "html2canvas";
 import {
   ArrowLeft,
   Camera,
+  CheckCircle2,
   Crown,
   Dices,
   Flag,
@@ -35,8 +35,11 @@ const defaultFilters: CupFilters = {
   categories: [],
   versions: [],
   difficulties: ["Expert", "Master", "Re:Master"],
+  rangeMode: "level",
   minLevel: "1",
   maxLevel: "15",
+  minConstant: 1,
+  maxConstant: 15,
   seed: randomSeed()
 };
 
@@ -55,6 +58,7 @@ export default function App() {
   const [history, setHistory] = useState<MatchRecord[]>([]);
   const [champion, setChampion] = useState<CupEntry | null>(null);
   const [undoStack, setUndoStack] = useState<BracketSnapshot[]>([]);
+  const [drawError, setDrawError] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
 
   const categories = useMemo(() => unique(songs.map((song) => song.category)), []);
@@ -63,6 +67,10 @@ export default function App() {
     () => unique(songs.flatMap((song) => song.charts.map((chart) => chart.level))).sort(compareLevel),
     []
   );
+  const constantBounds = useMemo(() => {
+    const values = songs.flatMap((song) => song.charts.map((chart) => chart.constant)).filter(isNumber);
+    return values.length ? { min: Math.min(...values), max: Math.max(...values) } : null;
+  }, []);
   useEffect(() => {
     if (!levelOptions.length) return;
     const first = levelOptions[0];
@@ -75,10 +83,13 @@ export default function App() {
   }, [levelOptions]);
   const pool = useMemo(() => toCupEntries(songs, filters), [filters]);
   const uniquePoolSongs = useMemo(() => new Set(pool.map((entry) => entry.songId)).size, [pool]);
-  const canStart = uniquePoolSongs >= 48;
+  const uniquePoolEntries = useMemo(() => new Set(pool.map((entry) => entry.id)).size, [pool]);
+  const canStart = uniquePoolEntries >= 48;
   const modeLabel = cupModeLabel(filters.mode);
   const difficultyModeText =
-    filters.mode === "chart" ? `${filters.difficulties[0] ?? "Expert"} / Lv ${filters.minLevel}-${filters.maxLevel}` : "分类与版本";
+    filters.mode === "chart"
+      ? `${filters.difficulties[0] ?? "Expert"} / ${filters.rangeMode === "level" ? `Lv ${filters.minLevel}–${filters.maxLevel}` : `定数 ${filters.minConstant.toFixed(1)}–${filters.maxConstant.toFixed(1)}`}`
+      : "歌曲本体 · 不区分难度";
   const cupMeta = `${modeLabel} / ${usingImportedSongs ? "CN 曲库" : "Mock 曲库"} / Seed ${filters.seed || "maimai-cup"}`;
   const transitionKey = `${phase}-${roundEntries.length}`;
   const currentGroup = groups[groupIndex] ?? [];
@@ -95,13 +106,17 @@ export default function App() {
   function startDraw(seed = filters.seed) {
     const seededFilters = { ...filters, seed };
     const entries = toCupEntries(songs, seededFilters);
+    const nextGroups = makeGroups(entries, seed);
+    const drawn = nextGroups.flat();
 
-    if (entries.length < 48) {
+    if (drawn.length !== 48 || new Set(drawn.map((entry) => entry.id)).size !== 48) {
+      setDrawError("当前筛选不足 48 个唯一参赛项，请放宽筛选条件后重试。");
       return;
     }
 
+    setDrawError("");
     setFilters(seededFilters);
-    setGroups(makeGroups(entries, seed));
+    setGroups(nextGroups);
     setGroupIndex(0);
     setGroupSelection([]);
     setQualified([]);
@@ -233,11 +248,16 @@ export default function App() {
     if (!resultRef.current) {
       return;
     }
+    const { default: html2canvas } = await import("html2canvas");
     const canvas = await html2canvas(resultRef.current, {
       backgroundColor: "#130810",
       scale: Math.min(window.devicePixelRatio || 2, 3),
       useCORS: true,
-      logging: false
+      logging: false,
+      windowWidth: 1280,
+      onclone: (documentClone) => {
+        documentClone.querySelector(".share-poster")?.classList.add("capture-mode");
+      }
     });
     const link = document.createElement("a");
     link.download = `maimai-cup-${champion?.title ?? "result"}.png`;
@@ -259,6 +279,7 @@ export default function App() {
     setHistory([]);
     setChampion(null);
     setUndoStack([]);
+    setDrawError("");
   }
 
   return (
@@ -278,6 +299,8 @@ export default function App() {
           {phaseLabel(phase)}
         </div>
       </div>
+
+      <CupStepper phase={phase} />
 
       <div className="phase-stage" key={transitionKey}>
         <StageIntro intro={getStageIntro(phase, roundEntries.length)} />
@@ -359,38 +382,95 @@ export default function App() {
                 </FilterBlock>
                 <p className="filter-hint">谱面杯固定同难度对决：红谱只会遇到红谱，紫谱只会遇到紫谱。</p>
 
-                <div className="range-grid">
-                  <label>
-                    等级下限
-                    <select
-                      value={filters.minLevel}
-                      onChange={(event) =>
-                        setFilters((current) => normalizeLevelRange({ ...current, minLevel: event.target.value }))
-                      }
-                    >
-                      {levelOptions.map((level) => (
-                        <option key={level} value={level}>
-                          Lv {level}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    等级上限
-                    <select
-                      value={filters.maxLevel}
-                      onChange={(event) =>
-                        setFilters((current) => normalizeLevelRange({ ...current, maxLevel: event.target.value }))
-                      }
-                    >
-                      {levelOptions.map((level) => (
-                        <option key={level} value={level}>
-                          Lv {level}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="range-mode" role="group" aria-label="谱面范围筛选方式">
+                  <button
+                    type="button"
+                    className={filters.rangeMode === "level" ? "active" : ""}
+                    onClick={() => setFilters({ ...filters, rangeMode: "level" })}
+                  >
+                    按等级
+                  </button>
+                  <button
+                    type="button"
+                    className={filters.rangeMode === "constant" ? "active" : ""}
+                    disabled={!constantBounds}
+                    onClick={() => setFilters({ ...filters, rangeMode: "constant" })}
+                  >
+                    按定数
+                  </button>
                 </div>
+                {!constantBounds ? (
+                  <p className="filter-hint subtle-hint">当前曲库没有 constant 字段，因此暂不可按定数筛选；等级筛选仍可正常使用。</p>
+                ) : null}
+
+                {filters.rangeMode === "level" ? (
+                  <div className="range-grid">
+                    <label>
+                      等级下限
+                      <select
+                        value={filters.minLevel}
+                        onChange={(event) =>
+                          setFilters((current) => normalizeLevelRange({ ...current, minLevel: event.target.value }))
+                        }
+                      >
+                        {levelOptions.map((level) => (
+                          <option key={level} value={level}>
+                            Lv {level}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      等级上限
+                      <select
+                        value={filters.maxLevel}
+                        onChange={(event) =>
+                          setFilters((current) => normalizeLevelRange({ ...current, maxLevel: event.target.value }))
+                        }
+                      >
+                        {levelOptions.map((level) => (
+                          <option key={level} value={level}>
+                            Lv {level}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="range-grid constant-range">
+                    <label>
+                      定数下限
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={constantBounds?.min ?? 1}
+                        max={filters.maxConstant}
+                        step="0.1"
+                        value={filters.minConstant}
+                        onChange={(event) =>
+                          setFilters((current) => ({ ...current, minConstant: Math.min(Number(event.target.value), current.maxConstant) }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      定数上限
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={filters.minConstant}
+                        max={constantBounds?.max ?? 15}
+                        step="0.1"
+                        value={filters.maxConstant}
+                        onChange={(event) =>
+                          setFilters((current) => ({ ...current, maxConstant: Math.max(Number(event.target.value), current.minConstant) }))
+                        }
+                      />
+                    </label>
+                  </div>
+                )}
+                <p className="filter-hint subtle-hint">
+                  等级始终按曲库原字段显示，例如「13+」不会改写成小数；定数只用于内部筛选。
+                </p>
               </>
             ) : null}
 
@@ -417,8 +497,12 @@ export default function App() {
               开始抽签 48 强
             </button>
             <p className={`pool-status ${canStart ? "ok" : "bad"}`}>
-              当前可参赛项 {pool.length} 个，去重歌曲 {uniquePoolSongs} 首，需要至少 48 首 / {usingImportedSongs ? "CN 曲库" : "Mock 曲库"}
+              {filters.mode === "song"
+                ? `当前可参赛歌曲 ${uniquePoolEntries} 首，需要至少 48 首`
+                : `当前可参赛谱面 ${uniquePoolEntries} 张，来自 ${uniquePoolSongs} 首歌，需要至少 48 张`}
+              {` / ${usingImportedSongs ? "CN 曲库" : "Mock 曲库"}`}
             </p>
+            {drawError ? <p className="form-error" role="alert">{drawError}</p> : null}
           </div>
 
           <div className="preview-grid">
@@ -436,7 +520,7 @@ export default function App() {
           <StageHeader
             icon={<Dices size={19} />}
             title={`${modeLabel} / 小组抽签`}
-            subtitle="48 个参赛项分为 12 组，每组 4 个；同一首歌不会重复进入本届杯赛。"
+            subtitle={`48 个唯一${filters.mode === "song" ? "歌曲" : "谱面"}分为 12 组，每组 4 个；相同参赛项绝不重复。`}
             meta={cupMeta}
             actions={
               <>
@@ -463,7 +547,7 @@ export default function App() {
                   <div className="draw-row" style={{ ["--row-stagger" as string]: `${entryIndex * 45}ms` }} key={entry.id}>
                     <img src={entry.jacket} alt="" />
                     <span>{entry.title}</span>
-                    {entry.chart ? <b>{entry.chart.difficulty}</b> : null}
+                    {entry.chart ? <b>{entry.chart.difficulty} · {entry.chart.level}</b> : null}
                   </div>
                 ))}
               </div>
@@ -481,6 +565,11 @@ export default function App() {
             meta={cupMeta}
           />
           <ProgressBar value={groupIndex} max={groups.length} />
+          <div className="selection-status" role="status">
+            <span>本组直通</span>
+            <strong>{groupSelection.length}<small>/2</small></strong>
+            <p>{groupSelection.length === 2 ? "已选满，可以锁定晋级名单" : `再选择 ${2 - groupSelection.length} 个参赛项`}</p>
+          </div>
           <div className="battle-grid four">
             {currentGroup.map((entry, index) => (
               <div className="stagger-item" style={{ ["--stagger" as string]: `${index * 80}ms` }} key={entry.id}>
@@ -493,9 +582,12 @@ export default function App() {
               </div>
             ))}
           </div>
-          <button className="primary-action narrow" disabled={groupSelection.length !== 2} onClick={confirmGroup}>
-            锁定直通名额
-          </button>
+          <div className="sticky-confirm">
+            <button className="primary-action narrow" disabled={groupSelection.length !== 2} onClick={confirmGroup}>
+              <CheckCircle2 size={18} />
+              锁定直通名额 · {groupSelection.length}/2
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -508,6 +600,11 @@ export default function App() {
             meta={cupMeta}
           />
           <ProgressBar value={revivalSelection.length} max={8} />
+          <div className="selection-status revival-count" role="status">
+            <span>复活名额</span>
+            <strong>{revivalSelection.length}<small>/8</small></strong>
+            <p>{revivalSelection.length === 8 ? "32 强阵容已就绪" : `还可选择 ${8 - revivalSelection.length} 个谱面或歌曲`}</p>
+          </div>
           <div className="battle-grid revival">
             {eliminated.map((entry, index) => (
               <div className="stagger-item" style={{ ["--stagger" as string]: `${Math.min(index, 16) * 28}ms` }} key={entry.id}>
@@ -521,9 +618,12 @@ export default function App() {
               </div>
             ))}
           </div>
-          <button className="primary-action narrow" disabled={revivalSelection.length !== 8} onClick={startBracket}>
-            进入 32 强淘汰赛
-          </button>
+          <div className="sticky-confirm">
+            <button className="primary-action narrow" disabled={revivalSelection.length !== 8} onClick={startBracket}>
+              <Swords size={18} />
+              进入 32 强淘汰赛 · {revivalSelection.length}/8
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -542,6 +642,7 @@ export default function App() {
             }
           />
           <ProgressBar value={matchIndex} max={roundEntries.length / 2} />
+          <RoundRoadmap currentRound={currentRoundName} history={history} />
           <div className="duel-zone">
             {currentMatch.map((entry, index) => (
               <div className={`duel-slot side-${index + 1}`} key={entry.id}>
@@ -583,6 +684,37 @@ export default function App() {
   );
 }
 
+const phaseOrder: Phase[] = ["config", "draw", "groups", "revival", "bracket", "result"];
+
+function CupStepper({ phase }: { phase: Phase }) {
+  const current = phaseOrder.indexOf(phase);
+  return (
+    <nav className="cup-stepper" aria-label="赛事流程">
+      {phaseOrder.map((item, index) => (
+        <div className={`${index === current ? "current" : ""} ${index < current ? "done" : ""}`} key={item}>
+          <span>{index < current ? <CheckCircle2 size={14} /> : index + 1}</span>
+          <b>{phaseLabel(item)}</b>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function RoundRoadmap({ currentRound, history }: { currentRound: string; history: MatchRecord[] }) {
+  const rounds = ["32 强", "16 强", "8 强", "半决赛", "决赛"];
+  const current = rounds.indexOf(currentRound);
+  return (
+    <div className="round-roadmap" aria-label="淘汰赛晋级路径">
+      {rounds.map((round, index) => (
+        <div className={`${index === current ? "current" : ""} ${index < current ? "done" : ""}`} key={round}>
+          <span>{round}</span>
+          <small>{history.filter((record) => record.round === round).length}/{16 / 2 ** index}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StageHeader({
   icon,
   title,
@@ -612,14 +744,24 @@ function StageHeader({
 }
 
 function StageIntro({ intro }: { intro: ReturnType<typeof getStageIntro> }) {
-  if (!intro) return null;
+  const [visible, setVisible] = useState(Boolean(intro));
+
+  useEffect(() => {
+    setVisible(Boolean(intro));
+    if (!intro) return;
+    const timer = window.setTimeout(() => setVisible(false), intro.variant === "champion" ? 6200 : 5000);
+    return () => window.clearTimeout(timer);
+  }, [intro?.key]);
+
+  if (!intro || !visible) return null;
 
   return (
-    <div className={`stage-intro intro-${intro.variant}`} key={intro.key} aria-hidden="true">
+    <div className={`stage-intro intro-${intro.variant}`} key={intro.key} role="status" aria-live="polite">
       <div className="stage-intro-inner">
         <span className="stage-intro-en">{intro.en}</span>
         <strong className="stage-intro-title">{intro.title}</strong>
         <span className="stage-intro-desc">{intro.desc}</span>
+        <button type="button" className="intro-skip" onClick={() => setVisible(false)}>进入本轮</button>
       </div>
     </div>
   );
@@ -647,9 +789,13 @@ function SharePoster({
   return (
     <div className="share-poster" ref={captureRef}>
       <div className="poster-header">
+        <div className="poster-kicker"><span>OFFICIAL RESULT</span><b>48 → 1</b></div>
         <p>MAIMAI CUP</p>
         <h2>{modeLabel} · 舞萌本命之巅</h2>
-        <span className="poster-seed">SEED · {seed || "maimai-cup"}</span>
+        <div className="poster-meta-line">
+          <span className="poster-seed">SEED · {seed || "maimai-cup"}</span>
+          <span>32 强完整晋级表</span>
+        </div>
       </div>
 
       <div className="poster-layout">
@@ -668,10 +814,16 @@ function SharePoster({
           {champion.chart ? (
             <div className="champion-chart">
               {champion.chart.difficulty} / Lv {champion.chart.level}
+              {typeof champion.chart.constant === "number" ? ` / 定数 ${champion.chart.constant.toFixed(1)}` : ""}
               {champion.chart.type && champion.chart.type !== "dx" ? ` / ${champion.chart.type.toUpperCase()}` : ""}
             </div>
           ) : null}
-          {runnerUp ? <div className="runner-up">亚军 / {runnerUp.title}</div> : null}
+          {runnerUp ? (
+            <div className="runner-up">
+              <img src={runnerUp.jacket} alt="" />
+              <span>亚军 · RUNNER-UP<b>{runnerUp.title}</b></span>
+            </div>
+          ) : null}
         </div>
 
         <BracketSide side="right" history={history} champion={champion} />
@@ -679,18 +831,22 @@ function SharePoster({
 
       <div className="poster-footer">
         <div className="poster-topfour">
-          <span>四强</span>
+          <span>FINAL FOUR · 四强</span>
           {topFour.slice(0, 4).map((entry) => (
-            <b key={entry.id}>{entry.title}</b>
+            <div className="poster-finisher" key={entry.id}>
+              <img src={entry.jacket} alt="" />
+              <b>{entry.title}</b>
+            </div>
           ))}
         </div>
         <div className="poster-path">
-          <span>冠军路径</span>
+          <span>ROAD TO CHAMPION · 冠军路径</span>
           {championPath.map((record) => (
-            <b key={`${record.round}-${record.matchNumber}`}>{record.loser.title}</b>
+            <b key={`${record.round}-${record.matchNumber}`}><small>{record.round}</small>{record.loser.title}</b>
           ))}
         </div>
       </div>
+      <div className="poster-domain"><span>MAIMAI MUSIC TOURNAMENT</span><b>maimai.utautai.org</b></div>
     </div>
   );
 }
@@ -700,9 +856,7 @@ function BracketSide({ side, history, champion }: { side: "left" | "right"; hist
   return (
     <div className={`poster-bracket poster-bracket-${side}`}>
       {rounds.map((round) => {
-        const matches = history.filter((record) => record.round === round);
-        const midpoint = Math.ceil(matches.length / 2);
-        const visible = side === "left" ? matches.slice(0, midpoint) : matches.slice(midpoint);
+        const visible = getSideMatches(history, round, side);
         return (
           <div className="poster-round" key={`${side}-${round}`}>
             <span className="poster-round-name">{round}</span>
@@ -720,6 +874,12 @@ function BracketSide({ side, history, champion }: { side: "left" | "right"; hist
       })}
     </div>
   );
+}
+
+function getSideMatches(history: MatchRecord[], round: string, side: "left" | "right") {
+  const matches = history.filter((record) => record.round === round).sort((a, b) => a.matchNumber - b.matchNumber);
+  const half = matches.length / 2;
+  return side === "left" ? matches.filter((record) => record.matchNumber <= half) : matches.filter((record) => record.matchNumber > half);
 }
 
 function MiniEntry({ entry, winner }: { entry: CupEntry; winner?: boolean }) {
@@ -801,6 +961,10 @@ function normalizeLevelRange(filters: CupFilters) {
 
 function isEntry(entry: CupEntry | undefined): entry is CupEntry {
   return Boolean(entry);
+}
+
+function isNumber(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function randomSeed() {

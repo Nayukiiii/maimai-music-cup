@@ -1,16 +1,22 @@
 # MAIMAI CUP / 舞萌本命之巅
 
-一个静态 SPA 版 maimai 风格 MUSIC CUP MVP。当前版本使用本地曲库，无账号、无数据库、不抽取或转存音频，适合先快速部署到 ORACLE-ARM / OCI。
+一个可直接游玩的 maimai 歌曲 / 谱面淘汰杯。第一屏就是赛事配置工具，视觉采用街机控制台、霓虹、樱花与正式赛事转播语言；项目保持纯静态 SPA，无账号、数据库或业务后端，适合部署到 ORACLE-ARM / OCI。
+
+线上地址：<https://maimai.utautai.org/>
 
 ## 功能
 
 - 歌曲杯：参赛单位是歌曲。
-- 谱面杯：参赛单位是歌曲 + 谱面，突出难度、等级、谱师。
+- 歌曲杯只提供分类、版本和随机种子，不出现难度、等级或定数筛选。
+- 谱面杯：参赛单位是歌曲 + 谱面，整届固定一个难度；支持按原始等级或内部定数范围筛选。
+- 等级严格显示曲库 `level` 原字段，例如 `13+` 始终显示为 `13+`，不会改写成小数。
 - 完整流程：配置 -> 抽签 -> 小组赛 -> 复活赛 -> 32 强淘汰赛 -> 结果页。
 - 小组赛：48 个参赛项，12 组，每组 4 个，用户选 2 个直通。
 - 复活赛：24 个落选项中选 8 个，组成 32 强。
 - 淘汰赛：32 强、16 强、8 强、半决赛、决赛。
-- 结果页：冠军、亚军、四强、冠军晋级路径、生成分享 PNG。
+- 结果页：冠军、亚军、四强、冠军晋级路径、完整 32 强记录和正式赛事海报 PNG。
+- 可复现抽签：随机种子会显示在各阶段与分享海报中。
+- 移动端：小组卡、复活池、对决操作、赛事进度和 Admin 均针对 390px 宽度适配。
 - YouTube 试听：只在用户点击「试听」时挂载官方 `youtube-nocookie.com` iframe。
 - 私密 Admin：`/admin` 使用 Nginx Basic Auth，支持本地编辑 YouTube 链接并导出构建期 JSON。
 
@@ -61,7 +67,8 @@ src/data/mockSongs.ts
   charts: [
     {
       difficulty: "Master",
-      level: "14",
+      level: "13+",
+      constant: 13.8,
       designer: "谱师名"
     }
   ]
@@ -99,29 +106,48 @@ src/data/youtubeSources.json
 
 `/admin` 是一个本地编辑器入口，由 Nginx Basic Auth 保护。它不会直接修改线上数据，改动先存在当前浏览器的 `localStorage` 草稿里，点击「导出」后下载 `youtubeSources.json`，再覆盖 `src/data/youtubeSources.json` 并重新构建部署。
 
-部署前先生成 admin 口令文件：
+部署前先生成 admin 口令文件。推荐交互式输入密码，避免把密码留在 shell history：
 
 ```bash
-docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'CHANGE_ME_STRONG_PASSWORD' > deploy/.htpasswd
+mkdir -p deploy
+docker run --rm -it -v "$PWD/deploy:/work" httpd:2.4-alpine \
+  htpasswd -cB /work/.htpasswd admin
 chmod 644 deploy/.htpasswd
+docker compose config
 docker compose up -d --build
 ```
 
 然后访问：
 
 ```text
-http://你的域名/admin
+https://你的域名/admin
 ```
 
 输入 `admin` 和你设置的密码。没有 `deploy/.htpasswd` 时 Nginx 容器会启动失败；建议只在 HTTPS 域名下使用 `/admin`，否则 Basic Auth 密码会明文传输。
 
-Admin 里可以填 YouTube Data API Key 后按「自动匹配」，它会用 `曲名 + 曲师 + maimai` 搜索第一条视频并写入草稿；不填 key 时「自动匹配」会打开 YouTube 搜索页。顶部「一键预览下一首」会在当前搜索范围内按顺序切换已挂音源，方便逐首检查。
+Admin 支持：
+
+- 大曲库工作台：左侧分页歌曲队列，右侧单曲匹配区，默认只显示未匹配歌曲。
+- 按曲名 / 歌手 / song ID 搜索，并筛选全部、已映射或未映射歌曲；支持 25 / 50 / 100 首分页。
+- 手动粘贴 YouTube URL / 视频 ID，保存后立即试听，或“保存并下一首”连续处理。
+- 支持 Enter 保存、Ctrl / Command + Enter 保存并进入下一首，以及一键跳到下一首未匹配歌曲。
+- 按 `曲名 + 歌手 + maimai` 自动匹配；填写 YouTube Data API Key 时请求首条候选，不填写时打开 YouTube 搜索页。
+- 自动匹配只填入候选，不会直接保存；可先试听确认，避免错误覆盖。
+- API Key 只放在当前浏览器标签页的 `sessionStorage`，不会写入源码、JSON 或构建产物。
+- 自动保存 `localStorage` 草稿，并显示待导出变更数。
+- 支持按 `songId + URL` 或 `曲名 + 歌手 + URL` 的制表符格式批量粘贴映射。
+- 导入、匹配、保存、试听与导出均有 loading / success / error 状态。
+- 导出结果固定为格式化的 `youtubeSources.json`；Admin 不会直接写服务器文件。
+
+顶部「预览下一首」会在当前搜索和筛选范围内顺序检查已映射音源。需要放弃未导出改动时，可用「放弃草稿」恢复到当前构建版本。
 
 导出后生效流程：
 
 ```bash
 # 用浏览器导出的文件覆盖 src/data/youtubeSources.json
 docker compose up -d --build
+docker compose ps
+curl -fsS http://127.0.0.1:18080/healthz
 ```
 
 如果你有可发布的静态试听片段，也可以继续使用“静态资产包”：
@@ -171,7 +197,7 @@ docker compose up -d --build
 docker compose run --rm cn-song-importer node scripts/import-cn-songs.mjs
 ```
 
-注意：该数据源没有 BPM 和谱师，导入器会把 BPM 设为 `0`，谱师设为 `maimaiNET`。等级筛选完全按 JSON 的 `level` 字段来，`13+` 就是 `13+`。
+注意：该数据源没有 BPM、谱师和定数，导入器会把 BPM 设为 `0`，谱师设为 `maimaiNET`，界面会禁用定数筛选。等级筛选完全按 JSON 的 `level` 字段来，`13+` 就是 `13+`。换用含 `constant` 的曲库后，定数筛选会自动启用。
 
 服务器宿主机没有安装 Node/npm 时，用 Docker 跑导入器：
 
@@ -273,7 +299,10 @@ server {
 ```text
 maimai-music-cup/
   src/
+    admin/AdminApp.tsx
     components/SongCard.tsx
+    data/importedSongs.json
+    data/youtubeSources.json
     data/mockSongs.ts
     lib/tournament.ts
     App.tsx
@@ -283,3 +312,18 @@ maimai-music-cup/
   nginx.conf
   docker-compose.yml
 ```
+
+## 赛事规则与数据约束
+
+- 抽签前必须得到至少 48 个唯一参赛项；抽签结果会再次校验 48 个 ID 全部唯一。
+- 歌曲杯参赛 ID 对应 `song.id`。
+- 谱面杯参赛 ID 由 song、difficulty、chart type、constant / level 与谱面序号共同组成，防止同一 `song/chart` 被重复抽入。
+- 谱面杯一次只能选择一个 difficulty，因此 Basic、Advanced、Expert、Master 与 Re:Master 不会跨难度配对。
+- 赛事记录保留从 32 强到决赛的 31 场结果；海报左右 bracket 均从 32 强向中央决赛汇聚。
+
+## 安全说明
+
+- `deploy/.htpasswd`、`.env*` 和本地资产源文件已由 `.gitignore` 排除。
+- Basic Auth 只应在 HTTPS 域名下使用；React 页面本身没有伪登录逻辑。
+- 不要把 GitHub Token、Admin 密码或 YouTube API Key 提交到仓库。
+- Nginx 提供基础安全响应头、隐藏文件拒绝访问和 `/healthz` 容器健康检查。

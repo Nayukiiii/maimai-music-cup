@@ -7,6 +7,12 @@ services:
       - "${APP_PORT:-18080}:80"
     volumes:
       - ./deploy/.htpasswd:/etc/nginx/.htpasswd:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -q '^ok$'"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
   asset-importer:
     image: node:20-alpine

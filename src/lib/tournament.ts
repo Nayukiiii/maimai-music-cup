@@ -40,9 +40,14 @@ export function toCupEntries(songs: Song[], filters: CupFilters): CupEntry[] {
     const chartCupDifficulty = filters.difficulties[0];
     return song.charts
       .filter((chart) => !chartCupDifficulty || chart.difficulty === chartCupDifficulty)
-      .filter((chart) => isLevelInRange(chart.level, filters.minLevel, filters.maxLevel))
-      .map((chart) => ({
-        id: `${song.id}-${chart.difficulty}`,
+      .filter((chart) => {
+        if (filters.rangeMode === "constant") {
+          return typeof chart.constant === "number" && chart.constant >= filters.minConstant && chart.constant <= filters.maxConstant;
+        }
+        return isLevelInRange(chart.level, filters.minLevel, filters.maxLevel);
+      })
+      .map((chart, chartIndex) => ({
+        id: `${song.id}::${chart.difficulty}::${chart.type ?? "dx"}::${chart.constant ?? chart.level}::${chartIndex}`,
         songId: song.id,
         title: song.title,
         artist: song.artist,
@@ -83,7 +88,7 @@ export function shuffleWithSeed<T>(items: T[], seed: string): T[] {
 }
 
 export function makeGroups(entries: CupEntry[], seed: string) {
-  return chunk(selectUniqueSongs(entries, seed, 48), 4);
+  return chunk(selectUniqueEntries(entries, seed, 48), 4);
 }
 
 export function chunk<T>(items: T[], size: number): T[][] {
@@ -118,29 +123,19 @@ function mulberry32(seedFactory: () => number) {
   };
 }
 
-function selectUniqueSongs(entries: CupEntry[], seed: string, count: number) {
+function selectUniqueEntries(entries: CupEntry[], seed: string, count: number) {
   const shuffled = shuffleWithSeed(entries, seed);
   const selected: CupEntry[] = [];
-  const usedSongIds = new Set<string>();
+  const usedEntryIds = new Set<string>();
 
   for (const entry of shuffled) {
-    if (usedSongIds.has(entry.songId)) {
+    if (usedEntryIds.has(entry.id)) {
       continue;
     }
     selected.push(entry);
-    usedSongIds.add(entry.songId);
+    usedEntryIds.add(entry.id);
     if (selected.length === count) {
       return selected;
-    }
-  }
-
-  for (const entry of shuffled) {
-    if (selected.some((selectedEntry) => selectedEntry.id === entry.id)) {
-      continue;
-    }
-    selected.push(entry);
-    if (selected.length === count) {
-      break;
     }
   }
 
