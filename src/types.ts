@@ -27,8 +27,11 @@ export interface CupFilters {
   categories: string[];
   versions: string[];
   difficulties: Difficulty[];
+  rangeMode: "level" | "constant";
   minLevel: string;
   maxLevel: string;
+  minConstant: number;
+  maxConstant: number;
   seed: string;
 }
 

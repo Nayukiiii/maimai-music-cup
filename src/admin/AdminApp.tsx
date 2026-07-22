@@ -1,16 +1,35 @@
-import { useMemo, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  ListMusic,
+  Play,
+  RotateCcw,
+  Save,
+  Search,
+  SkipForward,
+  Trash2,
+  Upload,
+  WandSparkles
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { songs } from "../data/songs";
 import { parseYouTube, YouTubeSource, youtubeEmbedUrl, youtubeSources } from "../data/youtube";
 import type { Song } from "../types";
 
 const DRAFT_KEY = "mmc-yt-draft";
-const API_KEY_STORAGE = "mmc-youtube-api-key";
+const API_KEY_SESSION = "mmc-youtube-api-key-session";
 type Draft = Record<string, YouTubeSource>;
-type MatchStatus = Record<string, string>;
+type FilterMode = "all" | "mapped" | "unmapped";
+type Notice = { tone: "info" | "success" | "error"; message: string } | null;
 
 function loadDraft(): Draft {
   try {
-    return { ...youtubeSources, ...JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}") };
+    const cached = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}") as Draft;
+    return { ...youtubeSources, ...cached };
   } catch {
     return { ...youtubeSources };
   }
@@ -18,92 +37,149 @@ function loadDraft(): Draft {
 
 export default function AdminApp() {
   const [draft, setDraft] = useState<Draft>(loadDraft);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) || "");
+  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem(API_KEY_SESSION) || "");
   const [query, setQuery] = useState("");
-  const [onlyUnmapped, setOnlyUnmapped] = useState(false);
+  const [filterMode, setFilterMode] = useState<FilterMode>("unmapped");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [activeSongId, setActiveSongId] = useState(songs[0]?.id || "");
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string | null>(null);
-  const [matchStatus, setMatchStatus] = useState<MatchStatus>({});
+  const [rowStatus, setRowStatus] = useState<Record<string, Notice>>({});
   const [matchingId, setMatchingId] = useState<string | null>(null);
+  const [bulkText, setBulkText] = useState("");
+  const [notice, setNotice] = useState<Notice>({ tone: "info", message: "先从左侧选择歌曲，在右侧完成匹配；保存后可自动进入下一首未映射歌曲。" });
 
-  function persist(next: Draft) {
-    setDraft(next);
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+  const queryFiltered = useMemo(() => {
+    const q = normalize(query);
+    return songs.filter((song) => !q || normalize(`${song.title} ${song.artist} ${song.id}`).includes(q));
+  }, [query]);
+
+  const filtered = useMemo(
+    () =>
+      queryFiltered.filter((song) => {
+        const mapped = Boolean(draft[song.id]);
+        return filterMode === "all" || (filterMode === "mapped" ? mapped : !mapped);
+      }),
+    [queryFiltered, filterMode, draft]
+  );
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const activeSong = songs.find((song) => song.id === activeSongId) ?? pageItems[0] ?? songs[0];
+  const activeSource = activeSong ? draft[activeSong.id] : undefined;
+  const candidateSource = activeSong ? parseYouTube(inputs[activeSong.id] ?? (activeSource ? sourceToUrl(activeSource) : "")) : null;
+  const mappedCount = songs.filter((song) => draft[song.id]).length;
+  const shippedCount = songs.filter((song) => youtubeSources[song.id]).length;
+  const changedCount = songs.filter((song) => JSON.stringify(draft[song.id]) !== JSON.stringify(youtubeSources[song.id])).length;
+  const unmappedCount = songs.length - mappedCount;
+
+  useEffect(() => {
+    setPage(0);
+  }, [query, filterMode, pageSize]);
+
+  useEffect(() => {
+    if (!pageItems.length) return;
+    if (!pageItems.some((song) => song.id === activeSongId)) selectSong(pageItems[0]);
+  }, [safePage, filterMode, query, draft]);
+
+  function persist(next: Draft, message?: string) {
+    try {
+      setDraft(next);
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+      if (message) setNotice({ tone: "success", message });
+    } catch {
+      setNotice({ tone: "error", message: "浏览器草稿保存失败，请立即导出 JSON 备份。" });
+    }
+  }
+
+  function selectSong(song: Song) {
+    setActiveSongId(song.id);
+    setPreview(null);
+    if (!inputs[song.id] && draft[song.id]) {
+      setInputs((current) => ({ ...current, [song.id]: sourceToUrl(draft[song.id]) }));
+    }
   }
 
   function saveApiKey(next: string) {
     setApiKey(next);
-    if (next.trim()) {
-      localStorage.setItem(API_KEY_STORAGE, next.trim());
-    } else {
-      localStorage.removeItem(API_KEY_STORAGE);
-    }
+    if (next.trim()) sessionStorage.setItem(API_KEY_SESSION, next.trim());
+    else sessionStorage.removeItem(API_KEY_SESSION);
   }
 
-  function assign(songId: string) {
+  function assign(songId: string, advance = false) {
     const parsed = parseYouTube(inputs[songId] || "");
     if (!parsed) {
-      alert("无法识别 YouTube 链接或视频 ID");
+      setRowStatus((current) => ({ ...current, [songId]: { tone: "error", message: "链接格式无效，请粘贴 YouTube URL 或 11 位视频 ID。" } }));
       return;
     }
-    persist({ ...draft, [songId]: parsed });
-    setPreview(songId);
+
+    const nextDraft = { ...draft, [songId]: parsed };
+    persist(nextDraft, advance ? "保存成功，已进入下一首未映射歌曲。" : "已保存到本地草稿。");
+    setRowStatus((current) => ({ ...current, [songId]: { tone: "success", message: "保存成功，可试听确认。" } }));
+
+    if (advance) goNextUnmapped(songId, nextDraft);
+    else setPreview(songId);
   }
 
   function remove(songId: string) {
     const next = { ...draft };
     delete next[songId];
-    persist(next);
-    setPreview((current) => (current === songId ? null : current));
+    persist(next, "映射已从草稿移除。");
+    setInputs((current) => ({ ...current, [songId]: "" }));
+    setPreview(null);
+  }
+
+  function goNextUnmapped(fromId = activeSongId, sourceMap = draft) {
+    const scope = queryFiltered.length ? queryFiltered : songs;
+    const start = Math.max(0, scope.findIndex((song) => song.id === fromId));
+    const ordered = [...scope.slice(start + 1), ...scope.slice(0, start + 1)];
+    const next = ordered.find((song) => !sourceMap[song.id]);
+    if (!next) {
+      setNotice({ tone: "success", message: query ? "当前搜索范围已全部完成映射。" : "全部歌曲都已完成映射。" });
+      return;
+    }
+    setFilterMode("unmapped");
+    setActiveSongId(next.id);
+    setPreview(null);
+    const nextVisible = queryFiltered.filter((song) => !sourceMap[song.id]);
+    const nextIndex = nextVisible.findIndex((song) => song.id === next.id);
+    if (nextIndex >= 0) setPage(Math.floor(nextIndex / pageSize));
   }
 
   async function autoMatch(song: Song) {
-    const searchQuery = buildSearchQuery(song);
     if (!apiKey.trim()) {
       window.open(youtubeSearchUrl(song), "_blank", "noopener,noreferrer");
-      setMatchStatus((items) => ({ ...items, [song.id]: "未填写 API Key，已打开 YouTube 搜索页。" }));
+      setRowStatus((current) => ({ ...current, [song.id]: { tone: "info", message: "已按“曲名 + 歌手 + maimai”打开 YouTube 搜索。复制目标链接回来即可。" } }));
       return;
     }
 
     setMatchingId(song.id);
-    setMatchStatus((items) => ({ ...items, [song.id]: "搜索中..." }));
+    setRowStatus((current) => ({ ...current, [song.id]: { tone: "info", message: "正在查找最匹配的视频…" } }));
     try {
-      const params = new URLSearchParams({
-        part: "snippet",
-        type: "video",
-        maxResults: "1",
-        q: searchQuery,
-        key: apiKey.trim()
-      });
+      const params = new URLSearchParams({ part: "snippet", type: "video", maxResults: "1", q: buildSearchQuery(song), key: apiKey.trim() });
       const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error(`YouTube API ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`YouTube API 返回 ${response.status}`);
       const data = (await response.json()) as {
-        items?: Array<{
-          id?: { videoId?: string };
-          snippet?: { title?: string; channelTitle?: string };
-        }>;
+        items?: Array<{ id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string } }>;
       };
-      const first = data.items?.find((item) => item.id?.videoId);
-      if (!first?.id?.videoId) {
-        setMatchStatus((items) => ({ ...items, [song.id]: "没有找到候选，试试手动搜索。" }));
-        return;
-      }
+      const match = data.items?.find((item) => item.id?.videoId);
+      if (!match?.id?.videoId) throw new Error("没有找到候选视频");
 
-      const source = { videoId: first.id.videoId };
-      persist({ ...draft, [song.id]: source });
-      setInputs((items) => ({ ...items, [song.id]: `https://www.youtube.com/watch?v=${first.id!.videoId}` }));
-      setPreview(song.id);
-      scrollToSong(song.id);
-      setMatchStatus((items) => ({
-        ...items,
-        [song.id]: `已匹配：${first.snippet?.title || first.id!.videoId}${first.snippet?.channelTitle ? ` / ${first.snippet.channelTitle}` : ""}`
+      const url = `https://www.youtube.com/watch?v=${match.id.videoId}`;
+      setInputs((current) => ({ ...current, [song.id]: url }));
+      setRowStatus((current) => ({
+        ...current,
+        [song.id]: {
+          tone: "success",
+          message: `找到候选：${match.snippet?.title || match.id!.videoId}${match.snippet?.channelTitle ? ` · ${match.snippet.channelTitle}` : ""}。试听确认后再保存。`
+        }
       }));
     } catch (error) {
-      setMatchStatus((items) => ({
-        ...items,
-        [song.id]: error instanceof Error ? `匹配失败：${error.message}` : "匹配失败"
+      setRowStatus((current) => ({
+        ...current,
+        [song.id]: { tone: "error", message: error instanceof Error ? `匹配失败：${error.message}` : "匹配失败，请手动搜索。" }
       }));
     } finally {
       setMatchingId(null);
@@ -111,161 +187,236 @@ export default function AdminApp() {
   }
 
   function exportJson() {
-    const blob = new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" });
+    const ordered = Object.fromEntries(Object.entries(draft).sort(([a], [b]) => a.localeCompare(b)));
+    const blob = new Blob([`${JSON.stringify(ordered, null, 2)}\n`], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "youtubeSources.json";
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "youtubeSources.json";
+    anchor.click();
     URL.revokeObjectURL(url);
+    setNotice({ tone: "success", message: `已导出 ${mappedCount} 条映射。请覆盖 src/data/youtubeSources.json 后重新构建。` });
   }
 
-  function importJson(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        persist({ ...draft, ...JSON.parse(String(reader.result)) });
-      } catch {
-        alert("JSON 解析失败");
+  async function importJson(file: File) {
+    setNotice({ tone: "info", message: "正在读取并校验 JSON…" });
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      if (!isSourceMap(parsed)) throw new Error("文件不是有效的 YouTube 映射对象");
+      persist({ ...draft, ...parsed }, `导入成功：合并 ${Object.keys(parsed).length} 条映射。`);
+    } catch (error) {
+      setNotice({ tone: "error", message: error instanceof Error ? `导入失败：${error.message}` : "导入失败" });
+    }
+  }
+
+  function importBulkText() {
+    const next = { ...draft };
+    const failures: string[] = [];
+    let imported = 0;
+
+    bulkText.split(/\r?\n/).forEach((line, index) => {
+      const columns = line.split("\t").map((value) => value.trim()).filter(Boolean);
+      if (!columns.length) return;
+      const url = columns[columns.length - 1] || "";
+      const source = parseYouTube(url);
+      const titleArtistMatches = columns.length === 3
+        ? songs.filter((item) => normalize(item.title) === normalize(columns[0]) && normalize(item.artist) === normalize(columns[1]))
+        : [];
+      const song = columns.length === 2
+        ? songs.find((item) => item.id === columns[0])
+        : titleArtistMatches.length === 1 ? titleArtistMatches[0] : undefined;
+      if (!source || !song) {
+        failures.push(String(index + 1));
+        return;
       }
-    };
-    reader.readAsText(file);
-  }
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return songs.filter((song) => {
-      if (onlyUnmapped && draft[song.id]) return false;
-      if (!q) return true;
-      return song.title.toLowerCase().includes(q) || song.artist.toLowerCase().includes(q);
+      next[song.id] = source;
+      imported += 1;
     });
-  }, [query, onlyUnmapped, draft]);
 
-  const displayed = filtered.slice(0, 300);
-  const previewable = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return songs
-      .filter((song) => {
-        if (!draft[song.id]) return false;
-        if (!q) return true;
-        return song.title.toLowerCase().includes(q) || song.artist.toLowerCase().includes(q);
-      })
-      .slice(0, 300);
-  }, [query, draft]);
-  const mappedCount = Object.keys(draft).length;
-
-  function previewNext() {
-    if (previewable.length === 0) {
-      alert("当前没有可预览的音源。先自动匹配或手动保存一首。");
+    if (!imported) {
+      setNotice({ tone: "error", message: "没有识别到有效映射。请检查制表符分隔格式和 YouTube 链接。" });
       return;
     }
-    const currentIndex = preview ? previewable.findIndex((song) => song.id === preview) : -1;
-    const next = previewable[(currentIndex + 1) % previewable.length];
-    setOnlyUnmapped(false);
-    setPreview(next.id);
-    scrollToSong(next.id);
+    persist(next, `批量导入 ${imported} 条映射${failures.length ? `；第 ${failures.join("、")} 行未识别` : ""}。`);
+    setBulkText("");
+  }
+
+  function resetDraft() {
+    persist({ ...youtubeSources }, "草稿已恢复为当前构建版本。");
+    setInputs({});
+    setPreview(null);
   }
 
   return (
-    <main className="admin-shell">
+    <main className="admin-shell admin-workbench-shell">
       <header className="admin-bar">
         <div>
-          <p className="eyebrow">ADMIN · YOUTUBE 曲源</p>
-          <h1 className="admin-title">音源管理</h1>
+          <p className="eyebrow">MAIMAI CUP · ADMIN</p>
+          <h1 className="admin-title">音源匹配工作台</h1>
+          <p className="admin-subtitle">左侧管理歌曲队列，右侧专注处理当前歌曲。适合连续整理大曲库。</p>
         </div>
-        <div className="admin-stat">
-          已挂 {mappedCount} / {songs.length} 首
-        </div>
+        <a className="ghost-action admin-back" href="/">返回赛事</a>
       </header>
 
-      <div className="admin-toolbar">
-        <input placeholder="搜索标题 / 曲师" value={query} onChange={(event) => setQuery(event.target.value)} />
-        <input
-          className="admin-api-key"
-          placeholder="YouTube Data API Key，可选"
-          value={apiKey}
-          onChange={(event) => saveApiKey(event.target.value)}
-        />
-        <label className="admin-check">
-          <input type="checkbox" checked={onlyUnmapped} onChange={(event) => setOnlyUnmapped(event.target.checked)} />
-          只看未挂
-        </label>
-        <button className="primary-inline" onClick={previewNext}>
-          一键预览下一首
-        </button>
-        <button className="primary-inline" onClick={exportJson}>
-          导出 youtubeSources.json
-        </button>
-        <label className="ghost-action admin-import">
-          导入 JSON
-          <input
-            type="file"
-            accept="application/json"
-            hidden
-            onChange={(event) => event.target.files?.[0] && importJson(event.target.files[0])}
-          />
-        </label>
-      </div>
+      <section className="admin-overview" aria-label="映射概览">
+        <div><span>已完成</span><strong>{mappedCount}</strong><small>/ {songs.length}</small></div>
+        <div><span>剩余未匹配</span><strong>{unmappedCount}</strong><small>首</small></div>
+        <div className={changedCount ? "changed" : ""}><span>待导出变更</span><strong>{changedCount}</strong><small>首</small></div>
+      </section>
 
-      <p className="filter-hint">
-        自动匹配使用你本浏览器里的 YouTube Data API Key，不会写进仓库；没填 key 时会打开 YouTube 搜索页。改动只存在草稿里，导出后覆盖 <code>src/data/youtubeSources.json</code> 并重建才生效。
-      </p>
+      <section className="admin-console">
+        <div className="admin-toolbar">
+          <label className="admin-search"><Search size={17} /><input aria-label="搜索歌曲" placeholder="搜索曲名 / 歌手 / ID" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+          <select aria-label="映射状态" value={filterMode} onChange={(event) => setFilterMode(event.target.value as FilterMode)}>
+            <option value="unmapped">仅未匹配 · {unmappedCount}</option>
+            <option value="mapped">仅已匹配 · {mappedCount}</option>
+            <option value="all">全部歌曲 · {songs.length}</option>
+          </select>
+          <button className="ghost-action" onClick={() => goNextUnmapped()}><SkipForward size={16} />下一首未匹配</button>
+          <button className="primary-inline" onClick={exportJson}><Download size={16} />导出 JSON</button>
+          <label className="ghost-action admin-import"><Upload size={16} />导入 JSON<input type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importJson(event.target.files[0])} /></label>
+          <button className="ghost-action danger-action" onClick={resetDraft} disabled={!changedCount}><RotateCcw size={16} />放弃草稿</button>
+        </div>
+        {notice ? <NoticeBar notice={notice} /> : null}
+      </section>
 
-      <div className="admin-list">
-        {displayed.map((song) => {
-          const current = draft[song.id];
-          return (
-            <div className="admin-row" id={adminRowId(song.id)} key={song.id}>
-              <img src={song.jacket} alt="" />
-              <div className="admin-meta">
-                <b>{song.title}</b>
-                <span>{song.artist}</span>
-                {current ? (
-                  <span className="admin-current">
-                    videoId: {current.videoId}
-                    {current.start ? ` @${current.start}s` : ""}
-                  </span>
-                ) : null}
+      <div className="admin-workbench">
+        <section className="admin-queue-panel">
+          <div className="admin-queue-head">
+            <div><ListMusic size={18} /><b>歌曲队列</b><span>{filtered.length} 首</span></div>
+            <select aria-label="每页数量" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+              <option value="25">25 / 页</option><option value="50">50 / 页</option><option value="100">100 / 页</option>
+            </select>
+          </div>
+
+          <div className="admin-song-list">
+            {pageItems.map((song, index) => {
+              const mapped = Boolean(draft[song.id]);
+              return (
+                <button className={`admin-song-row ${song.id === activeSong?.id ? "active" : ""}`} onClick={() => selectSong(song)} key={song.id}>
+                  <span className="admin-song-number">{safePage * pageSize + index + 1}</span>
+                  <img src={song.jacket} alt="" loading="lazy" />
+                  <span className="admin-song-copy"><b>{song.title}</b><small>{song.artist}</small></span>
+                  <span className={`mapping-dot ${mapped ? "mapped" : ""}`} title={mapped ? "已匹配" : "未匹配"} />
+                </button>
+              );
+            })}
+            {!pageItems.length ? <div className="admin-empty"><Search size={24} /><b>没有匹配结果</b><span>换个关键词或状态筛选试试。</span></div> : null}
+          </div>
+
+          <Pagination page={safePage} pageCount={pageCount} onChange={setPage} />
+        </section>
+
+        <section className="admin-editor-panel">
+          {activeSong ? (
+            <>
+              <div className="admin-editor-song">
+                <img src={activeSong.jacket} alt="" />
+                <div><span>当前歌曲</span><h2>{activeSong.title}</h2><p>{activeSong.artist}</p><small>{activeSong.category} · {activeSong.version} · ID {activeSong.id}</small></div>
+                <span className={`editor-map-state ${activeSource ? "mapped" : ""}`}>{activeSource ? "已匹配" : "未匹配"}</span>
               </div>
-              <div className="admin-actions">
+
+              <div className="admin-match-query"><span>搜索关键词</span><code>{buildSearchQuery(activeSong)}</code></div>
+
+              <label className="admin-url-field">
+                YouTube URL 或 11 位视频 ID
                 <input
-                  placeholder="粘贴 YouTube 链接或 ID"
-                  value={inputs[song.id] ?? ""}
-                  onChange={(event) => setInputs((items) => ({ ...items, [song.id]: event.target.value }))}
+                  autoFocus
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={inputs[activeSong.id] ?? (activeSource ? sourceToUrl(activeSource) : "")}
+                  onChange={(event) => setInputs((items) => ({ ...items, [activeSong.id]: event.target.value }))}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) assign(activeSong.id, true);
+                    else if (event.key === "Enter") assign(activeSong.id);
+                  }}
                 />
-                <button className="primary-inline" onClick={() => assign(song.id)}>
-                  保存
-                </button>
-                <button className="ghost-action" onClick={() => autoMatch(song)} disabled={matchingId === song.id}>
-                  {matchingId === song.id ? "匹配中" : "自动匹配"}
-                </button>
-                <button className="ghost-action" onClick={() => window.open(youtubeSearchUrl(song), "_blank", "noopener,noreferrer")}>
-                  搜歌
-                </button>
-                {current ? (
-                  <button className="ghost-action" onClick={() => setPreview(preview === song.id ? null : song.id)}>
-                    预览
-                  </button>
-                ) : null}
-                {current ? (
-                  <button className="ghost-action" onClick={() => remove(song.id)}>
-                    删除
-                  </button>
-                ) : null}
+              </label>
+
+              <div className="admin-editor-actions">
+                <button className="primary-inline" onClick={() => assign(activeSong.id)}><Save size={16} />保存并试听</button>
+                <button className="primary-inline save-next" onClick={() => assign(activeSong.id, true)}><SkipForward size={16} />保存并下一首</button>
+                <button className="ghost-action" onClick={() => autoMatch(activeSong)} disabled={matchingId === activeSong.id}><WandSparkles size={16} />{matchingId === activeSong.id ? "匹配中…" : "自动找候选"}</button>
+                {candidateSource ? <button className="ghost-action" onClick={() => setPreview(preview === activeSong.id ? null : activeSong.id)}><Play size={16} />{preview === activeSong.id ? "收起候选" : "试听候选"}</button> : null}
+                <a className="ghost-action" href={youtubeSearchUrl(activeSong)} target="_blank" rel="noreferrer"><ExternalLink size={16} />打开 YouTube 搜索</a>
               </div>
-              {matchStatus[song.id] ? <div className="admin-match-status">{matchStatus[song.id]}</div> : null}
-              {current && preview === song.id ? (
-                <div className="yt-frame admin-frame">
-                  <iframe src={youtubeEmbedUrl(current)} title={song.title} allow="autoplay; encrypted-media" allowFullScreen />
+
+              <p className="admin-shortcuts">Enter 保存并试听 · Ctrl / ⌘ + Enter 保存并进入下一首</p>
+              {rowStatus[activeSong.id] ? <NoticeBar notice={rowStatus[activeSong.id]!} /> : null}
+
+              {activeSource ? (
+                <div className="admin-current-source">
+                  <div><span>当前映射</span><code>{activeSource.videoId}{activeSource.start ? ` · ${activeSource.start}s` : ""}</code></div>
+                  <button className="ghost-action" onClick={() => setPreview(preview === activeSong.id ? null : activeSong.id)}><Play size={15} />{preview === activeSong.id ? "收起试听" : "试听当前源"}</button>
+                  <button className="ghost-action danger-action" onClick={() => remove(activeSong.id)}><Trash2 size={15} />删除映射</button>
                 </div>
               ) : null}
-            </div>
-          );
-        })}
-        {filtered.length > 300 ? <p className="filter-hint">仅显示前 300 条，用搜索缩小范围。</p> : null}
+
+              {candidateSource && preview === activeSong.id ? (
+                <div className="yt-frame admin-frame">
+                  <iframe
+                    src={youtubeEmbedUrl(candidateSource)}
+                    title={activeSong.title}
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    onLoad={() => setRowStatus((items) => ({ ...items, [activeSong.id]: { tone: "success", message: "播放器已载入，请确认音源与歌曲一致。" } }))}
+                    onError={() => setRowStatus((items) => ({ ...items, [activeSong.id]: { tone: "error", message: "播放器载入失败，请检查视频是否允许嵌入。" } }))}
+                  />
+                </div>
+              ) : null}
+
+              <details className="admin-api-panel">
+                <summary><WandSparkles size={16} />自动匹配设置（可选）</summary>
+                <label>YouTube Data API Key 仅保存在当前标签页。由于搜索 API 配额较高，不建议一次自动跑完整曲库。<input type="password" autoComplete="off" placeholder="不填写时直接打开 YouTube 搜索" value={apiKey} onChange={(event) => saveApiKey(event.target.value)} /></label>
+              </details>
+
+              <details className="admin-bulk-panel">
+                <summary><Upload size={16} />批量粘贴映射</summary>
+                <p>每行使用制表符分隔：<code>songId [Tab] URL</code>，或 <code>曲名 [Tab] 歌手 [Tab] URL</code>。</p>
+                <textarea value={bulkText} onChange={(event) => setBulkText(event.target.value)} placeholder={"song-id\thttps://youtu.be/xxxxxxxxxxx\n曲名\t歌手\thttps://youtu.be/xxxxxxxxxxx"} />
+                <button className="ghost-action" disabled={!bulkText.trim()} onClick={importBulkText}>校验并导入</button>
+              </details>
+            </>
+          ) : <div className="admin-empty"><ListMusic size={24} /><b>请选择一首歌曲</b></div>}
+        </section>
       </div>
+
+      <footer className="admin-build-note">当前构建版本 {shippedCount} 条映射 · 草稿自动保存在本浏览器 · 导出后覆盖 src/data/youtubeSources.json 并重新部署</footer>
     </main>
   );
+}
+
+function Pagination({ page, pageCount, onChange }: { page: number; pageCount: number; onChange: (page: number) => void }) {
+  return (
+    <div className="admin-pagination">
+      <button onClick={() => onChange(Math.max(0, page - 1))} disabled={page === 0}><ChevronLeft size={16} />上一页</button>
+      <span>第 <b>{page + 1}</b> / {pageCount} 页</span>
+      <button onClick={() => onChange(Math.min(pageCount - 1, page + 1))} disabled={page >= pageCount - 1}>下一页<ChevronRight size={16} /></button>
+    </div>
+  );
+}
+
+function NoticeBar({ notice }: { notice: NonNullable<Notice> }) {
+  return (
+    <div className={`admin-notice ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>
+      {notice.tone === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+      <span>{notice.message}</span>
+    </div>
+  );
+}
+
+function isSourceMap(value: unknown): value is Draft {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value).every(
+    (source) => Boolean(source) && typeof source === "object" && /^[a-zA-Z0-9_-]{11}$/.test(String((source as YouTubeSource).videoId || ""))
+  );
+}
+
+function normalize(value: string) {
+  return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function sourceToUrl(source: YouTubeSource) {
+  return `https://www.youtube.com/watch?v=${source.videoId}${source.start ? `&t=${source.start}` : ""}`;
 }
 
 function buildSearchQuery(song: Song) {
@@ -274,14 +425,4 @@ function buildSearchQuery(song: Song) {
 
 function youtubeSearchUrl(song: Song) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(buildSearchQuery(song))}`;
-}
-
-function scrollToSong(songId: string) {
-  window.setTimeout(() => {
-    document.getElementById(adminRowId(songId))?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, 80);
-}
-
-function adminRowId(songId: string) {
-  return `admin-song-${encodeURIComponent(songId)}`;
 }

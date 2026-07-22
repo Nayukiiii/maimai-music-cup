@@ -74,6 +74,9 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
             Lv {entry.chart.level}
             {showType ? ` / ${chartType!.toUpperCase()}` : ""}
           </span>
+          {typeof entry.chart.constant === "number" ? (
+            <span className="chart-constant">定数 {entry.chart.constant.toFixed(1)}</span>
+          ) : null}
           {showDesigner ? (
             <span className="designer">
               <Sparkles size={14} />
