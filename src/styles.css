@@ -1199,42 +1199,46 @@ button:not(:disabled):hover,
 .stage-intro-inner {
   position: relative;
   max-width: min(520px, 92%);
-  border: 1px solid rgba(255, 158, 199, 0.35);
+  border: 1px solid rgba(255, 180, 210, 0.48);
   border-radius: 16px;
-  padding: 30px 38px;
+  padding: 32px 40px;
   text-align: center;
-  background: linear-gradient(160deg, rgba(40, 18, 30, 0.88), rgba(20, 10, 18, 0.84));
-  backdrop-filter: blur(10px);
+  background:
+    linear-gradient(160deg, rgba(52, 22, 38, 0.96), rgba(18, 8, 16, 0.94)),
+    rgba(20, 8, 16, 0.96);
   box-shadow:
-    0 24px 70px rgba(18, 2, 12, 0.5),
-    0 0 40px rgba(255, 93, 143, 0.2);
-  animation: stage-intro 3600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    0 24px 70px rgba(18, 2, 12, 0.62),
+    0 0 44px rgba(255, 93, 143, 0.28);
+  animation: stage-intro 5200ms ease both;
+  will-change: opacity, transform;
 }
 
 .stage-intro-en {
   display: block;
-  color: var(--sakura-deep);
-  font-size: 0.82rem;
+  color: var(--sakura);
+  font-size: clamp(0.82rem, 1.8vw, 0.96rem);
   font-weight: 900;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.24em;
 }
 
 .stage-intro-title {
   display: block;
-  margin: 8px 0 6px;
+  margin: 10px 0 10px;
   background: linear-gradient(120deg, #fff2f7, var(--sakura) 55%, var(--sakura-deep));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  font-size: clamp(2.2rem, 7vw, 4rem);
+  font-size: clamp(2.6rem, 7.8vw, 4.8rem);
   line-height: 1;
+  text-shadow: 0 0 18px rgba(255, 158, 199, 0.25);
 }
 
 .stage-intro-desc {
   display: block;
   color: #ffe1ee;
-  font-size: clamp(0.95rem, 2vw, 1.08rem);
-  font-weight: 800;
+  font-size: clamp(1.02rem, 2.2vw, 1.18rem);
+  font-weight: 900;
+  line-height: 1.5;
 }
 
 .intro-semi .stage-intro-inner {
@@ -1268,7 +1272,7 @@ button:not(:disabled):hover,
   box-shadow:
     0 24px 80px rgba(18, 2, 12, 0.55),
     0 0 60px rgba(255, 212, 121, 0.3);
-  animation-duration: 4600ms;
+  animation-duration: 6400ms;
   animation-name: stage-intro-champion;
 }
 
@@ -1664,91 +1668,82 @@ button:not(:disabled):hover,
 @keyframes stage-intro {
   0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.9);
-    filter: blur(8px);
+    transform: translateY(18px) scale(0.96);
   }
-  10% {
+  8% {
     opacity: 1;
     transform: translateY(0) scale(1);
-    filter: blur(0);
   }
-  82% {
+  78% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(-10px) scale(1.02);
-    filter: blur(4px);
+    transform: translateY(-8px) scale(1.01);
   }
 }
 
 @keyframes stage-intro-semi {
   0% {
     opacity: 0;
-    transform: perspective(700px) rotateX(30deg) translateY(20px);
+    transform: perspective(700px) rotateX(18deg) translateY(18px);
   }
-  12% {
+  10% {
     opacity: 1;
     transform: perspective(700px) rotateX(0deg) translateY(0);
   }
-  82% {
+  78% {
     opacity: 1;
+    transform: perspective(700px) rotateX(0deg) translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(-12px) scale(1.03);
-    filter: blur(4px);
+    transform: translateY(-8px) scale(1.01);
   }
 }
 
 @keyframes stage-intro-final {
   0% {
     opacity: 0;
-    transform: scale(0.5);
-    filter: blur(10px);
+    transform: scale(0.88);
   }
-  12% {
+  10% {
     opacity: 1;
-    transform: scale(1.08);
-    filter: blur(0);
+    transform: scale(1.04);
   }
-  18% {
+  16% {
     transform: scale(1);
   }
-  84% {
+  80% {
     opacity: 1;
     transform: scale(1);
   }
   100% {
     opacity: 0;
-    transform: scale(1.05);
-    filter: blur(4px);
+    transform: scale(1.01);
   }
 }
 
 @keyframes stage-intro-champion {
   0% {
     opacity: 0;
-    transform: translateY(24px) scale(0.7);
-    filter: blur(12px);
+    transform: translateY(22px) scale(0.9);
   }
-  12% {
+  10% {
     opacity: 1;
-    transform: translateY(0) scale(1.06);
-    filter: blur(0);
+    transform: translateY(0) scale(1.04);
   }
-  18% {
+  16% {
     transform: scale(1);
   }
-  86% {
+  82% {
     opacity: 1;
     transform: scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(-10px) scale(1.04);
-    filter: blur(5px);
+    transform: translateY(-8px) scale(1.01);
   }
 }
 
