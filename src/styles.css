@@ -1395,6 +1395,11 @@ button:not(:disabled):hover,
   margin: 0;
 }
 
+.admin-toolbar > .admin-api-key {
+  flex-basis: 280px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .admin-check {
   display: inline-flex;
   align-items: center;
@@ -1478,6 +1483,20 @@ button:not(:disabled):hover,
 .admin-actions > button {
   min-height: 40px;
   padding: 8px 14px;
+}
+
+.admin-match-status {
+  grid-column: 3;
+  min-width: 0;
+  overflow: hidden;
+  border-left: 3px solid rgba(255, 158, 199, 0.55);
+  padding: 6px 10px;
+  color: #ffe1ee;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(255, 93, 143, 0.1);
+  font-size: 0.78rem;
+  font-weight: 850;
 }
 
 .admin-frame {
@@ -1768,6 +1787,10 @@ button:not(:disabled):hover,
   }
 
   .admin-actions {
+    grid-column: 1 / -1;
+  }
+
+  .admin-match-status {
     grid-column: 1 / -1;
   }
 }

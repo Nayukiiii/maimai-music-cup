@@ -115,6 +115,8 @@ http://你的域名/admin
 
 输入 `admin` 和你设置的密码。没有 `deploy/.htpasswd` 时 Nginx 容器会启动失败；建议只在 HTTPS 域名下使用 `/admin`，否则 Basic Auth 密码会明文传输。
 
+Admin 里可以填 YouTube Data API Key 后按「自动匹配」，它会用 `曲名 + 曲师 + maimai` 搜索第一条视频并写入草稿；不填 key 时「自动匹配」会打开 YouTube 搜索页。顶部「一键预览下一首」会在当前搜索范围内按顺序切换已挂音源，方便逐首检查。
+
 导出后生效流程：
 
 ```bash
