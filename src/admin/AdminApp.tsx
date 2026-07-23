@@ -22,8 +22,10 @@ import type { Song } from "../types";
 
 const DRAFT_KEY = "mmc-yt-draft";
 const API_KEY_SESSION = "mmc-youtube-api-key-session";
+const CANDIDATE_KEY = "mmc-youtube-candidates-v1";
+const SKIPPED_KEY = "mmc-youtube-review-skipped";
 type Draft = Record<string, YouTubeSource>;
-type FilterMode = "all" | "mapped" | "unmapped";
+type FilterMode = "all" | "mapped" | "unmapped" | "ready" | "noCandidate" | "skipped";
 type Notice = { tone: "info" | "success" | "error"; message: string } | null;
 type MatchCandidate = {
   videoId: string;
@@ -32,6 +34,13 @@ type MatchCandidate = {
   thumbnail: string;
   score: number;
 };
+type CandidateMap = Record<string, MatchCandidate[]>;
+type CandidateBundle = {
+  version: 1;
+  generatedAt?: string;
+  songCount?: number;
+  candidates: Record<string, Array<Omit<MatchCandidate, "score"> & { score?: number }>>;
+};
 
 function loadDraft(): Draft {
   try {
@@ -39,6 +48,22 @@ function loadDraft(): Draft {
     return { ...youtubeSources, ...cached };
   } catch {
     return { ...youtubeSources };
+  }
+}
+
+function loadCandidates(): CandidateMap {
+  try {
+    return JSON.parse(localStorage.getItem(CANDIDATE_KEY) || "{}") as CandidateMap;
+  } catch {
+    return {};
+  }
+}
+
+function loadSkipped(): Record<string, true> {
+  try {
+    return JSON.parse(localStorage.getItem(SKIPPED_KEY) || "{}") as Record<string, true>;
+  } catch {
+    return {};
   }
 }
 
@@ -52,7 +77,8 @@ export default function AdminApp() {
   const [activeSongId, setActiveSongId] = useState(songs[0]?.id || "");
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
-  const [candidates, setCandidates] = useState<Record<string, MatchCandidate[]>>({});
+  const [candidates, setCandidates] = useState<CandidateMap>(loadCandidates);
+  const [skippedSongs, setSkippedSongs] = useState<Record<string, true>>(loadSkipped);
   const [previewSource, setPreviewSource] = useState<YouTubeSource | null>(null);
   const [rowStatus, setRowStatus] = useState<Record<string, Notice>>({});
   const [matchingId, setMatchingId] = useState<string | null>(null);
@@ -68,9 +94,17 @@ export default function AdminApp() {
     () =>
       queryFiltered.filter((song) => {
         const mapped = Boolean(draft[song.id]);
-        return filterMode === "all" || (filterMode === "mapped" ? mapped : !mapped);
+        const hasCandidates = Boolean(candidates[song.id]?.length);
+        const scanned = hasOwn(candidates, song.id);
+        const skipped = Boolean(skippedSongs[song.id]);
+        if (filterMode === "mapped") return mapped;
+        if (filterMode === "unmapped") return !mapped;
+        if (filterMode === "ready") return !mapped && hasCandidates && !skipped;
+        if (filterMode === "noCandidate") return !mapped && scanned && !hasCandidates;
+        if (filterMode === "skipped") return !mapped && skipped;
+        return true;
       }),
-    [queryFiltered, filterMode, draft]
+    [queryFiltered, filterMode, draft, candidates, skippedSongs]
   );
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -85,6 +119,10 @@ export default function AdminApp() {
   const shippedCount = songs.filter((song) => youtubeSources[song.id]).length;
   const changedCount = songs.filter((song) => JSON.stringify(draft[song.id]) !== JSON.stringify(youtubeSources[song.id])).length;
   const unmappedCount = songs.length - mappedCount;
+  const scannedCount = songs.filter((song) => hasOwn(candidates, song.id)).length;
+  const readyCount = songs.filter((song) => !draft[song.id] && candidates[song.id]?.length && !skippedSongs[song.id]).length;
+  const noCandidateCount = songs.filter((song) => !draft[song.id] && hasOwn(candidates, song.id) && !candidates[song.id]?.length).length;
+  const skippedCount = songs.filter((song) => !draft[song.id] && skippedSongs[song.id]).length;
 
   useEffect(() => {
     setPage(0);
@@ -95,6 +133,32 @@ export default function AdminApp() {
     if (!pageItems.some((song) => song.id === activeSongId)) selectSong(pageItems[0]);
   }, [safePage, filterMode, query, pageSize]);
 
+  useEffect(() => {
+    function handleReviewKeys(event: KeyboardEvent) {
+      if (!activeSong || activeSource || !activeCandidates.length || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, button, a") || target?.isContentEditable) return;
+
+      const candidateIndex = Number(event.key) - 1;
+      if (candidateIndex >= 0 && candidateIndex < 6 && activeCandidates[candidateIndex]) {
+        event.preventDefault();
+        chooseCandidate(activeSong, activeCandidates[candidateIndex]);
+      } else if (event.key === " " && candidateSource) {
+        event.preventDefault();
+        setPreviewSource(previewSource?.videoId === candidateSource.videoId ? null : candidateSource);
+      } else if (event.key === "Enter" && candidateSource) {
+        event.preventDefault();
+        saveSource(activeSong.id, candidateSource, true);
+      } else if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        skipReviewSong(activeSong.id);
+      }
+    }
+
+    window.addEventListener("keydown", handleReviewKeys);
+    return () => window.removeEventListener("keydown", handleReviewKeys);
+  }, [activeSong, activeCandidates, candidateSource, previewSource, draft, skippedSongs, queryFiltered, filterMode]);
+
   function persist(next: Draft, message?: string) {
     try {
       setDraft(next);
@@ -103,6 +167,23 @@ export default function AdminApp() {
     } catch {
       setNotice({ tone: "error", message: "浏览器草稿保存失败，请立即导出 JSON 备份。" });
     }
+  }
+
+  function updateCandidateMap(updater: (current: CandidateMap) => CandidateMap) {
+    setCandidates((current) => {
+      const next = updater(current);
+      try {
+        localStorage.setItem(CANDIDATE_KEY, JSON.stringify(next));
+      } catch {
+        setNotice({ tone: "error", message: "候选包超过浏览器存储上限，请缩小生成批次后重新导入。" });
+      }
+      return next;
+    });
+  }
+
+  function updateSkippedSongs(next: Record<string, true>) {
+    setSkippedSongs(next);
+    localStorage.setItem(SKIPPED_KEY, JSON.stringify(next));
   }
 
   function selectSong(song: Song) {
@@ -121,12 +202,6 @@ export default function AdminApp() {
 
   function updateSearchQuery(songId: string, value: string) {
     setSearchQueries((current) => ({ ...current, [songId]: value }));
-    setCandidates((current) => {
-      if (!current[songId]?.length) return current;
-      const next = { ...current };
-      delete next[songId];
-      return next;
-    });
   }
 
   function assign(songId: string, advance = false) {
@@ -150,7 +225,16 @@ export default function AdminApp() {
         : { tone: "success", message: "保存成功，可试听确认。" }
     }));
 
-    if (advance) goNextUnmapped(songId, nextDraft);
+    if (skippedSongs[songId]) {
+      const nextSkipped = { ...skippedSongs };
+      delete nextSkipped[songId];
+      updateSkippedSongs(nextSkipped);
+    }
+
+    if (advance) {
+      if (filterMode === "ready") goNextCandidate(songId, nextDraft);
+      else goNextUnmapped(songId, nextDraft);
+    }
     else setPreviewSource(source);
   }
 
@@ -181,6 +265,31 @@ export default function AdminApp() {
     const nextVisible = queryFiltered.filter((song) => !sourceMap[song.id]);
     const nextIndex = nextVisible.findIndex((song) => song.id === next.id);
     if (nextIndex >= 0) setPage(Math.floor(nextIndex / pageSize));
+  }
+
+  function goNextCandidate(fromId = activeSongId, sourceMap = draft, skippedMap = skippedSongs) {
+    const scope = query.trim() ? queryFiltered : songs;
+    const start = Math.max(0, scope.findIndex((song) => song.id === fromId));
+    const ordered = [...scope.slice(start + 1), ...scope.slice(0, start + 1)];
+    const next = ordered.find((song) => !sourceMap[song.id] && candidates[song.id]?.length && !skippedMap[song.id]);
+    if (!next) {
+      setNotice({ tone: "success", message: query ? "当前搜索范围的候选已审核完成。" : "候选包已经审核完成；请处理“无候选”和“已跳过”队列。" });
+      return;
+    }
+    setFilterMode("ready");
+    setActiveSongId(next.id);
+    setPreviewSource(null);
+    const visible = scope.filter((song) => !sourceMap[song.id] && candidates[song.id]?.length && !skippedMap[song.id]);
+    const nextIndex = visible.findIndex((song) => song.id === next.id);
+    if (nextIndex >= 0) setPage(Math.floor(nextIndex / pageSize));
+  }
+
+  function skipReviewSong(songId: string) {
+    const nextSkipped = { ...skippedSongs, [songId]: true as const };
+    updateSkippedSongs(nextSkipped);
+    setPreviewSource(null);
+    setNotice({ tone: "info", message: "已暂时跳过；之后可在“已跳过”队列集中处理。" });
+    goNextCandidate(songId, draft, nextSkipped);
   }
 
   async function autoMatch(song: Song) {
@@ -220,7 +329,7 @@ export default function AdminApp() {
         .slice(0, 6);
       if (!results.length) throw new Error("没有找到候选视频");
 
-      setCandidates((current) => ({ ...current, [song.id]: results }));
+      updateCandidateMap((current) => ({ ...current, [song.id]: results }));
       setRowStatus((current) => ({
         ...current,
         [song.id]: {
@@ -259,6 +368,53 @@ export default function AdminApp() {
     anchor.click();
     URL.revokeObjectURL(url);
     setNotice({ tone: "success", message: `已导出 ${mappedCount} 条映射。请覆盖 src/data/youtubeSources.json 后重新构建。` });
+  }
+
+  async function importCandidateBundle(file: File) {
+    setNotice({ tone: "info", message: "正在读取候选包并计算匹配度…" });
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      if (!isCandidateBundle(parsed)) throw new Error("文件不是有效的 youtubeCandidates.json 候选包");
+      const songById = new Map(songs.map((song) => [song.id, song]));
+      let imported = 0;
+      let withResults = 0;
+      const next: CandidateMap = { ...candidates };
+
+      Object.entries(parsed.candidates).forEach(([songId, entries]) => {
+        const song = songById.get(songId);
+        if (!song) return;
+        next[songId] = entries
+          .filter((entry) => /^[a-zA-Z0-9_-]{11}$/.test(entry.videoId))
+          .slice(0, 6)
+          .map((entry) => ({
+            videoId: entry.videoId,
+            title: entry.title || entry.videoId,
+            channelTitle: entry.channelTitle || "未知频道",
+            thumbnail: entry.thumbnail || `https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg`,
+            score: scoreCandidate(song, entry)
+          }))
+          .sort((a, b) => b.score - a.score);
+        imported += 1;
+        if (next[songId].length) withResults += 1;
+      });
+
+      updateCandidateMap(() => next);
+      setFilterMode("ready");
+      setPage(0);
+      const first = songs.find((song) => !draft[song.id] && next[song.id]?.length && !skippedSongs[song.id]);
+      if (first) selectSong(first);
+      setNotice({ tone: "success", message: `候选包已导入：扫描 ${imported} 首，其中 ${withResults} 首有可审核候选。可直接使用键盘连续确认。` });
+    } catch (error) {
+      setNotice({ tone: "error", message: error instanceof Error ? `候选包导入失败：${error.message}` : "候选包导入失败" });
+    }
+  }
+
+  function clearCandidateBundle() {
+    updateCandidateMap(() => ({}));
+    updateSkippedSongs({});
+    setFilterMode("unmapped");
+    setPreviewSource(null);
+    setNotice({ tone: "info", message: "浏览器中的候选包和跳过记录已清除，已保存的音源映射不会受影响。" });
   }
 
   async function importJson(file: File) {
@@ -316,7 +472,7 @@ export default function AdminApp() {
         <div>
           <p className="eyebrow">MAIMAI CUP · ADMIN</p>
           <h1 className="admin-title">音源匹配工作台</h1>
-          <p className="admin-subtitle">左侧管理歌曲队列，右侧专注处理当前歌曲。适合连续整理大曲库。</p>
+          <p className="admin-subtitle">先导入离线候选包，再用键盘连续审核；一千首曲库也不需要逐首手动搜索。</p>
         </div>
         <a className="ghost-action admin-back" href="/">返回赛事</a>
       </header>
@@ -324,6 +480,7 @@ export default function AdminApp() {
       <section className="admin-overview" aria-label="映射概览">
         <div><span>已完成</span><strong>{mappedCount}</strong><small>/ {songs.length}</small></div>
         <div><span>剩余未匹配</span><strong>{unmappedCount}</strong><small>首</small></div>
+        <div className={readyCount ? "candidate-ready" : ""}><span>候选待审核</span><strong>{readyCount}</strong><small>/ 已扫描 {scannedCount}</small></div>
         <div className={changedCount ? "changed" : ""}><span>待导出变更</span><strong>{changedCount}</strong><small>首</small></div>
       </section>
 
@@ -332,12 +489,18 @@ export default function AdminApp() {
           <label className="admin-search"><Search size={17} /><input aria-label="搜索歌曲" placeholder="搜索曲名 / 歌手 / ID" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
           <select aria-label="映射状态" value={filterMode} onChange={(event) => setFilterMode(event.target.value as FilterMode)}>
             <option value="unmapped">仅未匹配 · {unmappedCount}</option>
+            <option value="ready">候选待审核 · {readyCount}</option>
+            <option value="noCandidate">无候选 · {noCandidateCount}</option>
+            <option value="skipped">已跳过 · {skippedCount}</option>
             <option value="mapped">仅已匹配 · {mappedCount}</option>
             <option value="all">全部歌曲 · {songs.length}</option>
           </select>
           <button className="ghost-action" onClick={() => goNextUnmapped()}><SkipForward size={16} />下一首未匹配</button>
+          {readyCount ? <button className="ghost-action" onClick={() => goNextCandidate()}><WandSparkles size={16} />下一首候选</button> : null}
+          <label className="primary-inline admin-import"><Upload size={16} />导入候选包<input type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importCandidateBundle(event.target.files[0])} /></label>
           <button className="primary-inline" onClick={exportJson}><Download size={16} />导出 JSON</button>
           <label className="ghost-action admin-import"><Upload size={16} />导入 JSON<input type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importJson(event.target.files[0])} /></label>
+          {scannedCount ? <button className="ghost-action danger-action" onClick={clearCandidateBundle}><Trash2 size={16} />清除候选包</button> : null}
           <button className="ghost-action danger-action" onClick={resetDraft} disabled={!changedCount}><RotateCcw size={16} />放弃草稿</button>
         </div>
         {notice ? <NoticeBar notice={notice} /> : null}
@@ -355,12 +518,14 @@ export default function AdminApp() {
           <div className="admin-song-list">
             {pageItems.map((song, index) => {
               const mapped = Boolean(draft[song.id]);
+              const ready = !mapped && Boolean(candidates[song.id]?.length) && !skippedSongs[song.id];
+              const skipped = !mapped && Boolean(skippedSongs[song.id]);
               return (
                 <button className={`admin-song-row ${song.id === activeSong?.id ? "active" : ""}`} onClick={() => selectSong(song)} key={song.id}>
                   <span className="admin-song-number">{safePage * pageSize + index + 1}</span>
                   <img src={song.jacket} alt="" loading="lazy" />
                   <span className="admin-song-copy"><b>{song.title}</b><small>{song.artist}</small></span>
-                  <span className={`mapping-dot ${mapped ? "mapped" : ""}`} title={mapped ? "已匹配" : "未匹配"} />
+                  <span className={`mapping-dot ${mapped ? "mapped" : ready ? "ready" : skipped ? "skipped" : ""}`} title={mapped ? "已匹配" : ready ? "候选待审核" : skipped ? "已跳过" : "未匹配"} />
                 </button>
               );
             })}
@@ -413,8 +578,14 @@ export default function AdminApp() {
                 {activeCandidates.length ? (
                   <div className="admin-candidate-section">
                     <div className="admin-candidate-summary">
-                      <b>{activeCandidates.length} 个候选</b>
+                      <b>{activeCandidates.length} 个候选 · 待审核 {readyCount} 首</b>
                       <span>“推荐”只代表文字匹配度，保存前仍建议试听。</span>
+                    </div>
+                    <div className="admin-review-hotkeys" aria-label="键盘审核快捷键">
+                      <span><kbd>1–6</kbd> 选候选</span>
+                      <span><kbd>Space</kbd> 试听</span>
+                      <span><kbd>Enter</kbd> 确认下一首</span>
+                      <button onClick={() => skipReviewSong(activeSong.id)}><kbd>S</kbd> 暂时跳过</button>
                     </div>
                     <div className="admin-candidate-list">
                       {activeCandidates.map((candidate, index) => {
@@ -423,7 +594,7 @@ export default function AdminApp() {
                         const duplicate = songs.find((song) => song.id !== activeSong.id && draft[song.id]?.videoId === candidate.videoId);
                         return (
                           <article className={`admin-candidate ${selected ? "selected" : ""}`} key={candidate.videoId}>
-                            <div className="admin-candidate-rank">{index + 1}</div>
+                            <div className="admin-candidate-rank"><kbd>{index + 1}</kbd></div>
                             <img src={candidate.thumbnail} alt="" loading="lazy" />
                             <div className="admin-candidate-copy">
                               <div>
@@ -546,6 +717,23 @@ function isSourceMap(value: unknown): value is Draft {
   return Object.values(value).every(
     (source) => Boolean(source) && typeof source === "object" && /^[a-zA-Z0-9_-]{11}$/.test(String((source as YouTubeSource).videoId || ""))
   );
+}
+
+function isCandidateBundle(value: unknown): value is CandidateBundle {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const bundle = value as Partial<CandidateBundle>;
+  if (bundle.version !== 1 || !bundle.candidates || typeof bundle.candidates !== "object" || Array.isArray(bundle.candidates)) return false;
+  return Object.values(bundle.candidates).every(
+    (entries) => Array.isArray(entries) && entries.every((entry) => {
+      if (!entry || typeof entry !== "object") return false;
+      const candidate = entry as Partial<MatchCandidate>;
+      return /^[a-zA-Z0-9_-]{11}$/.test(candidate.videoId || "") && typeof candidate.title === "string";
+    })
+  );
+}
+
+function hasOwn(value: object, key: PropertyKey) {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function normalize(value: string) {
