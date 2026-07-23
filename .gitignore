@@ -1,12 +1,17 @@
 node_modules/
 dist/
 .vite/
+__pycache__/
 *.tsbuildinfo
 .env
 .env.*
 asset-sources.json
 youtubeCandidates.json
 youtubeCandidates.json.tmp
+data/raw/
+game-file-scan*.json
+jp_asset_tasks.json
+jp_assets_manifest.csv
 deploy/.htpasswd
 npm-debug.log*
 .DS_Store
