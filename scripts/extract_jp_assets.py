@@ -33,6 +33,7 @@ def main() -> int:
     parser.add_argument("--skip-jackets", action="store_true")
     parser.add_argument("--skip-previews", action="store_true")
     parser.add_argument("--jacket-limit", type=int, default=0)
+    parser.add_argument("--jacket-workers", type=int, default=0, help="Parallel jacket workers. Default: auto.")
     parser.add_argument("--preview-limit", type=int, default=0)
     parser.add_argument("--preview-start", type=float, default=30.0)
     parser.add_argument("--preview-duration", type=float, default=30.0)
@@ -83,7 +84,8 @@ def extract_jackets(package_root: Path, site_root: Path, rows: list[dict[str, st
     if args.jacket_limit:
         unique = unique[: args.jacket_limit]
 
-    done = skipped = failed = 0
+    jobs: list[tuple[str, Path, Path]] = []
+    skipped = 0
     for row in unique:
         bundle_rel = row.get("jacketBundle") or row.get("jacketSmallBundle")
         out_web = row.get("expectedJacketPng")
@@ -96,15 +98,50 @@ def extract_jackets(package_root: Path, site_root: Path, rows: list[dict[str, st
             skipped += 1
             continue
         output.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            export_first_texture(UnityPy, bundle, output, args.jacket_max_size, args.jacket_quality)
-            done += 1
-            print(f"封面 {row['assetId']} -> {output}")
-        except Exception as exc:
-            failed += 1
-            print(f"封面失败 {bundle}: {exc}", file=sys.stderr)
+        jobs.append((row["assetId"], bundle, output))
+
+    workers = jacket_worker_count(args.jacket_workers)
+    done = failed = 0
+    total = len(jobs)
+    if total:
+        print(f"封面并行：workers={workers}，待导出={total}，已存在/跳过={skipped}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [
+            executor.submit(export_jacket_job, UnityPy, args, asset_id, bundle, output)
+            for asset_id, bundle, output in jobs
+        ]
+        for index, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+            asset_id, output, error = future.result()
+            if error:
+                failed += 1
+                print(f"[{index}/{total}] 封面失败 {asset_id}: {error}", file=sys.stderr)
+            else:
+                done += 1
+                print(f"[{index}/{total}] 封面 {asset_id} -> {output}")
 
     print(f"封面：导出 {done}，跳过 {skipped}，失败 {failed}")
+
+
+def jacket_worker_count(value: int) -> int:
+    if value > 0:
+        return max(1, value)
+    cpu_count = os.cpu_count() or 4
+    return max(1, min(8, cpu_count))
+
+
+def export_jacket_job(
+    UnityPy: Any,
+    args: argparse.Namespace,
+    asset_id: str,
+    bundle: Path,
+    output: Path,
+) -> tuple[str, Path, str | None]:
+    try:
+        export_first_texture(UnityPy, bundle, output, args.jacket_max_size, args.jacket_quality)
+        return asset_id, output, None
+    except Exception as exc:
+        return asset_id, output, str(exc)
 
 
 def export_first_texture(UnityPy: Any, bundle: Path, output: Path, max_size: int, quality: int) -> None:
