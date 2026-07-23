@@ -426,7 +426,7 @@ function ChartTable({ charts }: { charts: Chart[] }) {
           <span className={`difficulty ${difficultyClass[chart.difficulty] || ""}`}>{chart.difficulty}</span>
           <b>Lv {chart.level}</b>
           <strong>{typeof chart.constant === "number" ? chart.constant.toFixed(1) : "缺失"}</strong>
-          <span className="asset-chart-designer">{chart.designer || "maimaiNET"}</span>
+          <span className="asset-chart-designer">{formatDesigner(chart.designer)}</span>
           <span className="asset-chart-type">{chartTypeLabel(chart.type)}</span>
         </div>
       ))}
@@ -437,6 +437,11 @@ function ChartTable({ charts }: { charts: Chart[] }) {
 function chartTypeLabel(type: string | undefined) {
   if (type === "standard") return "SD谱";
   return "DX谱";
+}
+
+function formatDesigner(designer: string | undefined) {
+  const value = (designer || "").trim();
+  return value && !["-", "－", "ー", "maimaiNET"].includes(value) ? value : "-";
 }
 
 function StatCard({ label, value, detail, tone }: { label: string; value: number; detail: string; tone?: "ok" | "bad" }) {

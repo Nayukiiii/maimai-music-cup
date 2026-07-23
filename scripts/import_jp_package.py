@@ -10,6 +10,7 @@ containers, but it does not decrypt, unpack, decode, or publish assets.
 from __future__ import annotations
 
 import argparse
+import collections
 import csv
 import json
 import re
@@ -132,7 +133,8 @@ def main() -> int:
             continue
 
         ma2_paths = sorted(xml_path.parent.glob("*.ma2"))
-        charts = parsed["charts"] or charts_from_ma2(ma2_paths, chart_type)
+        ma2_charts = charts_from_ma2(ma2_paths, chart_type)
+        charts = merge_chart_metadata(parsed["charts"], ma2_charts) if parsed["charts"] else ma2_charts
         if not args.keep_zero_level_charts:
             charts = [chart for chart in charts if chart.get("level") != "0" and chart.get("constant") != 0]
         if not charts:
@@ -213,11 +215,26 @@ def main() -> int:
     print(f"Song JSON: {out_json}")
     print(f"Asset manifest: {Path(args.manifest).resolve()}")
     print(f"Asset tasks: {Path(args.tasks).resolve()}")
+    print_designer_summary(songs)
     if warnings:
         print(f"Warnings: {len(warnings)}，前几条：")
         for warning in warnings[:12]:
             print(f"- {warning}")
     return 0
+
+
+def print_designer_summary(songs: list[dict[str, Any]]) -> None:
+    print("Designer summary:")
+    for difficulty in DIFFICULTIES:
+        values = collections.Counter(
+            normalize_designer(chart.get("designer", "")) or "-"
+            for song in songs
+            for chart in song.get("charts", [])
+            if chart.get("difficulty") == difficulty
+        )
+        total = sum(values.values())
+        top = ", ".join(f"{name}:{count}" for name, count in values.most_common(6))
+        print(f"- {difficulty}: {total} / {top}")
 
 
 def parse_music_xml(path: Path, chart_type: str) -> dict[str, Any]:
@@ -315,25 +332,30 @@ def normalize_version_title(value: str) -> str:
 
 
 def parse_notes(root: ET.Element, chart_type: str) -> list[dict[str, Any]]:
-    notes = [node for node in root.iter() if strip_ns(node.tag).lower() in {"notes", "notesdata"}]
+    notes = [
+        node
+        for node in root.iter()
+        if strip_ns(node.tag).lower() in {"notes", "notesdata"}
+        and has_direct_chart_fields(node)
+    ]
     charts = []
     for index, node in enumerate(notes):
-        local_index = read_int(find_deep_text(node, ["levelid", "difficulty", "diff"])) 
+        local_index = read_int(find_direct_text(node, ["levelid", "difficulty", "diff"])) 
         difficulty = DIFFICULTIES[local_index] if local_index is not None and 0 <= local_index < len(DIFFICULTIES) else None
         if difficulty is None and index < len(DIFFICULTIES):
             difficulty = DIFFICULTIES[index]
         if difficulty is None:
             continue
 
-        level_int = read_int(find_deep_text(node, ["level"]))
-        level_decimal = read_int(find_deep_text(node, ["leveldecimal", "level_decimal"]))
-        level_text = find_deep_text(node, ["leveltext", "level_text", "levelstr", "level_str"])
+        level_int = read_int(find_direct_text(node, ["level"]))
+        level_decimal = read_int(find_direct_text(node, ["leveldecimal", "level_decimal"]))
+        level_text = find_direct_text(node, ["leveltext", "level_text", "levelstr", "level_str"])
         constant = make_constant(level_int, level_decimal)
         display_level = normalize_level(level_text, level_int, level_decimal)
         if not display_level:
             display_level = "?"
 
-        designer = find_deep_text(node, ["notesdesigner/str", "notesdesigner", "designer/str", "designer"]) or "maimaiNET"
+        designer = normalize_designer(find_direct_text(node, ["notesdesigner/str", "designer/str", "notesdesigner", "designer"]))
         chart = {
             "difficulty": difficulty,
             "level": display_level,
@@ -358,7 +380,7 @@ def parse_notes_from_index(text_index: dict[str, list[str]], chart_type: str) ->
         chart = {
             "difficulty": DIFFICULTIES[index],
             "level": normalize_level(level, level_int, level_decimal) or level or "?",
-            "designer": designers[index] if index < len(designers) and designers[index] else "maimaiNET",
+            "designer": normalize_designer(designers[index] if index < len(designers) else ""),
             "type": chart_type,
         }
         constant = make_constant(level_int, level_decimal)
@@ -377,13 +399,65 @@ def charts_from_ma2(paths: list[Path], chart_type: str) -> list[dict[str, Any]]:
         difficulty = CHART_SUFFIXES.get(match.group(1))
         if not difficulty:
             continue
-        charts.append({
+        metadata = parse_ma2_metadata(path)
+        chart = {
             "difficulty": difficulty,
-            "level": "?",
-            "designer": "maimaiNET",
+            "level": metadata.get("level") or "?",
+            "designer": normalize_designer(metadata.get("designer", "")),
             "type": chart_type,
-        })
+        }
+        if metadata.get("constant") is not None:
+            chart["constant"] = metadata["constant"]
+        charts.append(chart)
     return dedupe_charts(charts)
+
+
+def merge_chart_metadata(primary: list[dict[str, Any]], fallback: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    fallback_by_difficulty = {chart.get("difficulty"): chart for chart in fallback}
+    merged = []
+    for chart in primary:
+        ma2_chart = fallback_by_difficulty.get(chart.get("difficulty"), {})
+        next_chart = dict(chart)
+        if is_blank_designer(next_chart.get("designer")) and not is_blank_designer(ma2_chart.get("designer")):
+            next_chart["designer"] = ma2_chart["designer"]
+        if (next_chart.get("level") in {None, "", "?"}) and ma2_chart.get("level"):
+            next_chart["level"] = ma2_chart["level"]
+        if next_chart.get("constant") is None and ma2_chart.get("constant") is not None:
+            next_chart["constant"] = ma2_chart["constant"]
+        merged.append(next_chart)
+
+    seen = {chart.get("difficulty") for chart in merged}
+    merged.extend(chart for chart in fallback if chart.get("difficulty") not in seen)
+    return dedupe_charts(merged)
+
+
+def parse_ma2_metadata(path: Path) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    try:
+        text = path.read_text(encoding="utf-8-sig", errors="ignore")
+    except OSError:
+        return metadata
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = [part.strip() for part in re.split(r"[\t,]", line) if part.strip()]
+        if not parts:
+            continue
+        key = parts[0].lower()
+        values = parts[1:]
+        joined = clean(" ".join(values))
+        if key in {"designer", "notesdesigner", "notes_designer", "des", "chart_designer"} and joined:
+            metadata["designer"] = joined
+        elif key in {"lv", "level", "leveltext", "level_text"} and values:
+            metadata["level"] = normalize_level(values[0], read_int(values[0]), None) or values[0]
+        elif key in {"lvdecimal", "leveldecimal", "level_decimal", "constant", "const"} and values:
+            number = read_decimal(values[0])
+            if number is not None:
+                metadata["constant"] = number
+
+    return metadata
 
 
 def dedupe_charts(charts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -435,6 +509,51 @@ def find_deep_text(node: ET.Element, keys: list[str]) -> str:
     return first_text(index, keys)
 
 
+def has_direct_chart_fields(node: ET.Element) -> bool:
+    return bool(find_direct_text(node, [
+        "level",
+        "leveldecimal",
+        "level_decimal",
+        "leveltext",
+        "level_text",
+        "levelstr",
+        "level_str",
+        "notesdesigner/str",
+        "designer/str",
+    ]))
+
+
+def find_direct_text(node: ET.Element, keys: list[str]) -> str:
+    for key in keys:
+        value = find_direct_path_text(node, key.lower().split("/"))
+        if value:
+            return clean(value)
+    return ""
+
+
+def find_direct_path_text(node: ET.Element, parts: list[str]) -> str:
+    if not parts:
+        return clean(node.text or "")
+
+    target = parts[0]
+    for child in list(node):
+        tag = strip_ns(child.tag).lower()
+        if tag != target:
+            continue
+        if len(parts) == 1:
+            value = clean(child.text or "")
+            if value:
+                return value
+            str_child = find_direct_path_text(child, ["str"])
+            if str_child:
+                return str_child
+        else:
+            value = find_direct_path_text(child, parts[1:])
+            if value:
+                return value
+    return ""
+
+
 def strip_ns(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -483,9 +602,26 @@ def read_int(value: str | None) -> int | None:
     return int(match.group(0)) if match else None
 
 
+def read_decimal(value: str | None) -> float | None:
+    if value is None:
+        return None
+    match = re.search(r"-?\d+(?:\.\d+)?", str(value))
+    return round(float(match.group(0)), 1) if match else None
+
+
 def parse_bpm(value: str) -> int:
     number = read_int(value)
     return number or 0
+
+
+def normalize_designer(value: Any) -> str:
+    designer = clean(value)
+    return "" if is_blank_designer(designer) else designer
+
+
+def is_blank_designer(value: Any) -> bool:
+    designer = clean(value)
+    return designer in {"", "-", "－", "ー", "maimaiNET"}
 
 
 def clean(value: Any) -> str:

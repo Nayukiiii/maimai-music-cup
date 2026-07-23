@@ -21,7 +21,7 @@ interface SongCardProps {
   onSelect?: (entry: CupEntry) => void;
 }
 
-const PLACEHOLDER_DESIGNERS = new Set(["maimainet", ""]);
+const PLACEHOLDER_DESIGNERS = new Set(["maimainet", "-", "－", "ー", ""]);
 
 export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel, onSelect }: SongCardProps) {
   const clickable = Boolean(onSelect) && !disabled;
@@ -83,7 +83,7 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
             </span>
             <span className="chart-spec designer-spec">
               <small>谱师</small>
-              <b>{showDesigner ? designer : "maimaiNET"}</b>
+              <b>{showDesigner ? designer : "-"}</b>
             </span>
           </span>
         </span>
