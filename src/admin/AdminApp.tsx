@@ -26,6 +26,7 @@ const CANDIDATE_KEY = "mmc-youtube-candidates-v1";
 const SKIPPED_KEY = "mmc-youtube-review-skipped";
 type Draft = Record<string, YouTubeSource>;
 type FilterMode = "all" | "mapped" | "unmapped" | "ready" | "noCandidate" | "skipped";
+type ReviewSort = "confidence" | "needsReview" | "library";
 type Notice = { tone: "info" | "success" | "error"; message: string } | null;
 type MatchCandidate = {
   videoId: string;
@@ -72,6 +73,7 @@ export default function AdminApp() {
   const [apiKey, setApiKey] = useState(() => sessionStorage.getItem(API_KEY_SESSION) || "");
   const [query, setQuery] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("unmapped");
+  const [reviewSort, setReviewSort] = useState<ReviewSort>("confidence");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [activeSongId, setActiveSongId] = useState(songs[0]?.id || "");
@@ -90,9 +92,8 @@ export default function AdminApp() {
     return songs.filter((song) => !q || normalize(`${song.title} ${song.artist} ${song.id}`).includes(q));
   }, [query]);
 
-  const filtered = useMemo(
-    () =>
-      queryFiltered.filter((song) => {
+  const filtered = useMemo(() => {
+      const items = queryFiltered.filter((song) => {
         const mapped = Boolean(draft[song.id]);
         const hasCandidates = Boolean(candidates[song.id]?.length);
         const scanned = hasOwn(candidates, song.id);
@@ -103,9 +104,14 @@ export default function AdminApp() {
         if (filterMode === "noCandidate") return !mapped && scanned && !hasCandidates;
         if (filterMode === "skipped") return !mapped && skipped;
         return true;
-      }),
-    [queryFiltered, filterMode, draft, candidates, skippedSongs]
-  );
+      });
+      if (filterMode !== "ready" || reviewSort === "library") return items;
+      return [...items].sort((a, b) => {
+        const scoreA = candidates[a.id]?.[0]?.score ?? -Infinity;
+        const scoreB = candidates[b.id]?.[0]?.score ?? -Infinity;
+        return reviewSort === "confidence" ? scoreB - scoreA : scoreA - scoreB;
+      });
+    }, [queryFiltered, filterMode, reviewSort, draft, candidates, skippedSongs]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
@@ -510,9 +516,18 @@ export default function AdminApp() {
         <section className="admin-queue-panel">
           <div className="admin-queue-head">
             <div><ListMusic size={18} /><b>歌曲队列</b><span>{filtered.length} 首</span></div>
-            <select aria-label="每页数量" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
-              <option value="25">25 / 页</option><option value="50">50 / 页</option><option value="100">100 / 页</option>
-            </select>
+            <div className="admin-queue-controls">
+              {filterMode === "ready" ? (
+                <select aria-label="候选排序" value={reviewSort} onChange={(event) => setReviewSort(event.target.value as ReviewSort)}>
+                  <option value="confidence">推荐优先</option>
+                  <option value="needsReview">需核对优先</option>
+                  <option value="library">曲库顺序</option>
+                </select>
+              ) : null}
+              <select aria-label="每页数量" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+                <option value="25">25 / 页</option><option value="50">50 / 页</option><option value="100">100 / 页</option>
+              </select>
+            </div>
           </div>
 
           <div className="admin-song-list">
