@@ -35,6 +35,8 @@ def main() -> int:
     parser.add_argument("--preview-start", type=float, default=30.0)
     parser.add_argument("--preview-duration", type=float, default=30.0)
     parser.add_argument("--preview-bitrate", default="96k")
+    parser.add_argument("--jacket-max-size", type=int, default=0, help="Resize jackets so the longest side is at most this size.")
+    parser.add_argument("--jacket-quality", type=int, default=86, help="JPEG/WebP quality. Default: 86")
     parser.add_argument("--vgmstream", default="vgmstream-cli")
     parser.add_argument("--ffmpeg", default="ffmpeg")
     parser.add_argument("--force", action="store_true")
@@ -92,7 +94,7 @@ def extract_jackets(package_root: Path, site_root: Path, rows: list[dict[str, st
             continue
         output.parent.mkdir(parents=True, exist_ok=True)
         try:
-            export_first_texture(UnityPy, bundle, output)
+            export_first_texture(UnityPy, bundle, output, args.jacket_max_size, args.jacket_quality)
             done += 1
             print(f"封面 {row['assetId']} -> {output}")
         except Exception as exc:
@@ -102,7 +104,7 @@ def extract_jackets(package_root: Path, site_root: Path, rows: list[dict[str, st
     print(f"封面：导出 {done}，跳过 {skipped}，失败 {failed}")
 
 
-def export_first_texture(UnityPy: Any, bundle: Path, output: Path) -> None:
+def export_first_texture(UnityPy: Any, bundle: Path, output: Path, max_size: int, quality: int) -> None:
     env = UnityPy.load(str(bundle))
     candidates = []
     for obj in env.objects:
@@ -117,7 +119,17 @@ def export_first_texture(UnityPy: Any, bundle: Path, output: Path) -> None:
     if not candidates:
         raise RuntimeError("AssetBundle 中没有可导出的 Texture2D/Sprite")
     _, image = max(candidates, key=lambda item: item[0])
-    image.save(output)
+    if max_size > 0:
+        image.thumbnail((max_size, max_size))
+    save_kwargs: dict[str, Any] = {}
+    suffix = output.suffix.lower()
+    if suffix in {".jpg", ".jpeg", ".webp"}:
+        if image.mode not in {"RGB", "RGBA"}:
+            image = image.convert("RGBA")
+        save_kwargs["quality"] = max(1, min(100, int(quality)))
+        if suffix == ".webp":
+            save_kwargs["method"] = 6
+    image.save(output, **save_kwargs)
 
 
 def extract_previews(package_root: Path, site_root: Path, rows: list[dict[str, str]], args: argparse.Namespace) -> None:

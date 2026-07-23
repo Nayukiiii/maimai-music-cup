@@ -36,6 +36,7 @@ def main() -> int:
     parser.add_argument("--manifest", default="jp_assets_manifest.csv")
     parser.add_argument("--tasks", default="jp_asset_tasks.json")
     parser.add_argument("--jacket-web-dir", default="/assets/jackets/jp-db")
+    parser.add_argument("--jacket-ext", default=".png", help="Generated jacket extension, e.g. .png or .webp")
     parser.add_argument("--preview-web-dir", default="/assets/previews/jp-db")
     parser.add_argument("--fallback-artist", default="maimai")
     parser.add_argument(
@@ -93,7 +94,8 @@ def main() -> int:
         awb = sound_root / f"music{asset_id}.awb"
 
         song_id = f"jp-{raw_id}"
-        jacket_png = f"{args.jacket_web_dir}/ui_jacket_{asset_id}.png"
+        jacket_ext = args.jacket_ext if args.jacket_ext.startswith(".") else f".{args.jacket_ext}"
+        jacket_path = f"{args.jacket_web_dir}/ui_jacket_{asset_id}{jacket_ext}"
         preview_mp3 = f"{args.preview_web_dir}/music{asset_id}.mp3"
         title = parsed["title"] or f"music{raw_id}"
 
@@ -103,7 +105,7 @@ def main() -> int:
             "artist": parsed["artist"] or args.fallback_artist,
             "category": parsed["category"] or "未分类",
             "version": version_map.get(parsed["version"], parsed["version"]) or "日服",
-            "jacket": jacket_png,
+            "jacket": jacket_path,
             "bpm": parsed["bpm"] or 0,
             "charts": charts,
         }
@@ -121,7 +123,7 @@ def main() -> int:
             "musicDir": rel(xml_path.parent, package_root),
             "jacketBundle": rel(jacket_bundle, package_root) if jacket_bundle.exists() else "",
             "jacketSmallBundle": rel(jacket_s_bundle, package_root) if jacket_s_bundle.exists() else "",
-            "expectedJacketPng": jacket_png,
+            "expectedJacketPng": jacket_path,
             "audioAcb": rel(acb, package_root) if acb.exists() else "",
             "audioAwb": rel(awb, package_root) if awb.exists() else "",
             "expectedPreviewMp3": preview_mp3,
