@@ -25,6 +25,13 @@ const API_KEY_SESSION = "mmc-youtube-api-key-session";
 type Draft = Record<string, YouTubeSource>;
 type FilterMode = "all" | "mapped" | "unmapped";
 type Notice = { tone: "info" | "success" | "error"; message: string } | null;
+type MatchCandidate = {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnail: string;
+  score: number;
+};
 
 function loadDraft(): Draft {
   try {
@@ -44,7 +51,9 @@ export default function AdminApp() {
   const [pageSize, setPageSize] = useState(50);
   const [activeSongId, setActiveSongId] = useState(songs[0]?.id || "");
   const [inputs, setInputs] = useState<Record<string, string>>({});
-  const [preview, setPreview] = useState<string | null>(null);
+  const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
+  const [candidates, setCandidates] = useState<Record<string, MatchCandidate[]>>({});
+  const [previewSource, setPreviewSource] = useState<YouTubeSource | null>(null);
   const [rowStatus, setRowStatus] = useState<Record<string, Notice>>({});
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState("");
@@ -70,6 +79,8 @@ export default function AdminApp() {
   const activeSong = songs.find((song) => song.id === activeSongId) ?? pageItems[0] ?? songs[0];
   const activeSource = activeSong ? draft[activeSong.id] : undefined;
   const candidateSource = activeSong ? parseYouTube(inputs[activeSong.id] ?? (activeSource ? sourceToUrl(activeSource) : "")) : null;
+  const activeSearchQuery = activeSong ? searchQueries[activeSong.id] ?? buildSearchQuery(activeSong) : "";
+  const activeCandidates = activeSong ? candidates[activeSong.id] ?? [] : [];
   const mappedCount = songs.filter((song) => draft[song.id]).length;
   const shippedCount = songs.filter((song) => youtubeSources[song.id]).length;
   const changedCount = songs.filter((song) => JSON.stringify(draft[song.id]) !== JSON.stringify(youtubeSources[song.id])).length;
@@ -82,7 +93,7 @@ export default function AdminApp() {
   useEffect(() => {
     if (!pageItems.length) return;
     if (!pageItems.some((song) => song.id === activeSongId)) selectSong(pageItems[0]);
-  }, [safePage, filterMode, query, draft]);
+  }, [safePage, filterMode, query, pageSize]);
 
   function persist(next: Draft, message?: string) {
     try {
@@ -96,7 +107,7 @@ export default function AdminApp() {
 
   function selectSong(song: Song) {
     setActiveSongId(song.id);
-    setPreview(null);
+    setPreviewSource(null);
     if (!inputs[song.id] && draft[song.id]) {
       setInputs((current) => ({ ...current, [song.id]: sourceToUrl(draft[song.id]) }));
     }
@@ -108,6 +119,16 @@ export default function AdminApp() {
     else sessionStorage.removeItem(API_KEY_SESSION);
   }
 
+  function updateSearchQuery(songId: string, value: string) {
+    setSearchQueries((current) => ({ ...current, [songId]: value }));
+    setCandidates((current) => {
+      if (!current[songId]?.length) return current;
+      const next = { ...current };
+      delete next[songId];
+      return next;
+    });
+  }
+
   function assign(songId: string, advance = false) {
     const parsed = parseYouTube(inputs[songId] || "");
     if (!parsed) {
@@ -115,12 +136,22 @@ export default function AdminApp() {
       return;
     }
 
-    const nextDraft = { ...draft, [songId]: parsed };
+    saveSource(songId, parsed, advance);
+  }
+
+  function saveSource(songId: string, source: YouTubeSource, advance = false) {
+    const nextDraft = { ...draft, [songId]: source };
+    const duplicate = songs.find((song) => song.id !== songId && draft[song.id]?.videoId === source.videoId);
     persist(nextDraft, advance ? "保存成功，已进入下一首未映射歌曲。" : "已保存到本地草稿。");
-    setRowStatus((current) => ({ ...current, [songId]: { tone: "success", message: "保存成功，可试听确认。" } }));
+    setRowStatus((current) => ({
+      ...current,
+      [songId]: duplicate
+        ? { tone: "info", message: `已保存，但这个视频也用于“${duplicate.title}”，请确认是否为同一音源。` }
+        : { tone: "success", message: "保存成功，可试听确认。" }
+    }));
 
     if (advance) goNextUnmapped(songId, nextDraft);
-    else setPreview(songId);
+    else setPreviewSource(source);
   }
 
   function remove(songId: string) {
@@ -128,11 +159,15 @@ export default function AdminApp() {
     delete next[songId];
     persist(next, "映射已从草稿移除。");
     setInputs((current) => ({ ...current, [songId]: "" }));
-    setPreview(null);
+    setPreviewSource(null);
   }
 
   function goNextUnmapped(fromId = activeSongId, sourceMap = draft) {
-    const scope = queryFiltered.length ? queryFiltered : songs;
+    const scope = query.trim() ? queryFiltered : songs;
+    if (!scope.length) {
+      setNotice({ tone: "error", message: "当前搜索没有歌曲，无法定位下一首未匹配项。" });
+      return;
+    }
     const start = Math.max(0, scope.findIndex((song) => song.id === fromId));
     const ordered = [...scope.slice(start + 1), ...scope.slice(0, start + 1)];
     const next = ordered.find((song) => !sourceMap[song.id]);
@@ -142,38 +177,55 @@ export default function AdminApp() {
     }
     setFilterMode("unmapped");
     setActiveSongId(next.id);
-    setPreview(null);
+    setPreviewSource(null);
     const nextVisible = queryFiltered.filter((song) => !sourceMap[song.id]);
     const nextIndex = nextVisible.findIndex((song) => song.id === next.id);
     if (nextIndex >= 0) setPage(Math.floor(nextIndex / pageSize));
   }
 
   async function autoMatch(song: Song) {
+    const searchQuery = searchQueries[song.id]?.trim() || buildSearchQuery(song);
     if (!apiKey.trim()) {
-      window.open(youtubeSearchUrl(song), "_blank", "noopener,noreferrer");
-      setRowStatus((current) => ({ ...current, [song.id]: { tone: "info", message: "已按“曲名 + 歌手 + maimai”打开 YouTube 搜索。复制目标链接回来即可。" } }));
+      window.open(youtubeSearchUrl(song, searchQuery), "_blank", "noopener,noreferrer");
+      setRowStatus((current) => ({ ...current, [song.id]: { tone: "info", message: "未设置 API Key，已用当前关键词打开 YouTube 搜索。复制目标链接回来即可。" } }));
       return;
     }
 
     setMatchingId(song.id);
-    setRowStatus((current) => ({ ...current, [song.id]: { tone: "info", message: "正在查找最匹配的视频…" } }));
+    setRowStatus((current) => ({ ...current, [song.id]: { tone: "info", message: "正在搜索并计算候选匹配度…" } }));
     try {
-      const params = new URLSearchParams({ part: "snippet", type: "video", maxResults: "1", q: buildSearchQuery(song), key: apiKey.trim() });
+      const params = new URLSearchParams({ part: "snippet", type: "video", maxResults: "8", q: searchQuery, key: apiKey.trim() });
       const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
       if (!response.ok) throw new Error(`YouTube API 返回 ${response.status}`);
       const data = (await response.json()) as {
-        items?: Array<{ id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string } }>;
+        items?: Array<{
+          id?: { videoId?: string };
+          snippet?: { title?: string; channelTitle?: string; thumbnails?: { medium?: { url?: string }; default?: { url?: string } } };
+        }>;
       };
-      const match = data.items?.find((item) => item.id?.videoId);
-      if (!match?.id?.videoId) throw new Error("没有找到候选视频");
+      const results = (data.items ?? [])
+        .flatMap((item): MatchCandidate[] => {
+          const videoId = item.id?.videoId;
+          if (!videoId) return [];
+          const candidate = {
+            videoId,
+            title: decodeEntities(item.snippet?.title || videoId),
+            channelTitle: decodeEntities(item.snippet?.channelTitle || "未知频道"),
+            thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+            score: 0
+          };
+          return [{ ...candidate, score: scoreCandidate(song, candidate) }];
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 6);
+      if (!results.length) throw new Error("没有找到候选视频");
 
-      const url = `https://www.youtube.com/watch?v=${match.id.videoId}`;
-      setInputs((current) => ({ ...current, [song.id]: url }));
+      setCandidates((current) => ({ ...current, [song.id]: results }));
       setRowStatus((current) => ({
         ...current,
         [song.id]: {
           tone: "success",
-          message: `找到候选：${match.snippet?.title || match.id!.videoId}${match.snippet?.channelTitle ? ` · ${match.snippet.channelTitle}` : ""}。试听确认后再保存。`
+          message: `找到 ${results.length} 个候选，已按曲名、歌手、官方音源特征排序。请试听后确认。`
         }
       }));
     } catch (error) {
@@ -184,6 +236,17 @@ export default function AdminApp() {
     } finally {
       setMatchingId(null);
     }
+  }
+
+  function chooseCandidate(song: Song, candidate: MatchCandidate, advance = false) {
+    const source = { videoId: candidate.videoId };
+    setInputs((current) => ({ ...current, [song.id]: sourceToUrl(source) }));
+    setPreviewSource(source);
+    setRowStatus((current) => ({
+      ...current,
+      [song.id]: { tone: "success", message: `已选择“${candidate.title}”${advance ? "并保存" : "，试听无误后即可保存"}。` }
+    }));
+    if (advance) saveSource(song.id, source, true);
   }
 
   function exportJson() {
@@ -244,7 +307,7 @@ export default function AdminApp() {
   function resetDraft() {
     persist({ ...youtubeSources }, "草稿已恢复为当前构建版本。");
     setInputs({});
-    setPreview(null);
+    setPreviewSource(null);
   }
 
   return (
@@ -316,7 +379,96 @@ export default function AdminApp() {
                 <span className={`editor-map-state ${activeSource ? "mapped" : ""}`}>{activeSource ? "已匹配" : "未匹配"}</span>
               </div>
 
-              <div className="admin-match-query"><span>搜索关键词</span><code>{buildSearchQuery(activeSong)}</code></div>
+              <section className="admin-match-studio" aria-label="YouTube 候选匹配">
+                <div className="admin-match-heading">
+                  <div><span>STEP 1</span><b>搜索并比较候选音源</b></div>
+                  <small>每次最多返回 6 条，按匹配度排序</small>
+                </div>
+
+                <div className="admin-match-query">
+                  <label htmlFor="admin-youtube-query">搜索关键词</label>
+                  <div>
+                    <input
+                      id="admin-youtube-query"
+                      value={activeSearchQuery}
+                      onChange={(event) => updateSearchQuery(activeSong.id, event.target.value)}
+                      onKeyDown={(event) => event.key === "Enter" && autoMatch(activeSong)}
+                    />
+                    <button className="primary-inline" onClick={() => autoMatch(activeSong)} disabled={matchingId === activeSong.id || !activeSearchQuery.trim()}>
+                      <WandSparkles size={16} />{matchingId === activeSong.id ? "搜索中…" : apiKey.trim() ? "搜索候选" : "去 YouTube 搜索"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="admin-query-presets" aria-label="搜索词模板">
+                  <span>快速改词</span>
+                  {searchPresets(activeSong).map((preset) => (
+                    <button type="button" key={preset.label} onClick={() => updateSearchQuery(activeSong.id, preset.query)}>
+                      {preset.label}
+                    </button>
+                  ))}
+                  <a href={youtubeSearchUrl(activeSong, activeSearchQuery)} target="_blank" rel="noreferrer"><ExternalLink size={13} />浏览器搜索</a>
+                </div>
+
+                {activeCandidates.length ? (
+                  <div className="admin-candidate-section">
+                    <div className="admin-candidate-summary">
+                      <b>{activeCandidates.length} 个候选</b>
+                      <span>“推荐”只代表文字匹配度，保存前仍建议试听。</span>
+                    </div>
+                    <div className="admin-candidate-list">
+                      {activeCandidates.map((candidate, index) => {
+                        const selected = candidateSource?.videoId === candidate.videoId;
+                        const playing = previewSource?.videoId === candidate.videoId;
+                        const duplicate = songs.find((song) => song.id !== activeSong.id && draft[song.id]?.videoId === candidate.videoId);
+                        return (
+                          <article className={`admin-candidate ${selected ? "selected" : ""}`} key={candidate.videoId}>
+                            <div className="admin-candidate-rank">{index + 1}</div>
+                            <img src={candidate.thumbnail} alt="" loading="lazy" />
+                            <div className="admin-candidate-copy">
+                              <div>
+                                <span className={`candidate-confidence ${confidenceClass(candidate.score)}`}>{confidenceLabel(candidate.score)}</span>
+                                {selected ? <span className="candidate-selected"><CheckCircle2 size={12} />已选用</span> : null}
+                                {duplicate ? <span className="candidate-duplicate" title={`该视频已映射给 ${duplicate.title}`}>重复源 · {duplicate.title}</span> : null}
+                              </div>
+                              <b title={candidate.title}>{candidate.title}</b>
+                              <small>{candidate.channelTitle}</small>
+                            </div>
+                            <div className="admin-candidate-actions">
+                              <button className="ghost-action" onClick={() => setPreviewSource(playing ? null : { videoId: candidate.videoId })}><Play size={14} />{playing ? "收起" : "试听"}</button>
+                              <button className="ghost-action" onClick={() => chooseCandidate(activeSong, candidate)}>选用</button>
+                              <button className="primary-inline" onClick={() => chooseCandidate(activeSong, candidate, true)}>确认并下一首</button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="admin-candidate-empty">
+                    <WandSparkles size={18} />
+                    <span>{apiKey.trim() ? "搜索后会在这里列出多个候选，不再直接采用第一条结果。" : "填写下方 API Key 可在页面内比较候选；不填写则打开 YouTube 搜索。"}</span>
+                  </div>
+                )}
+              </section>
+
+              {previewSource ? (
+                <div className="admin-preview-panel">
+                  <div><span>正在试听</span><code>{previewSource.videoId}</code><button onClick={() => setPreviewSource(null)}>关闭播放器</button></div>
+                  <div className="yt-frame admin-frame">
+                    <iframe
+                      src={youtubeEmbedUrl(previewSource)}
+                      title={`${activeSong.title} 候选试听`}
+                      allow="autoplay; encrypted-media"
+                      allowFullScreen
+                      onLoad={() => setRowStatus((items) => ({ ...items, [activeSong.id]: { tone: "success", message: "播放器已载入，请核对曲名、歌手和音源内容。" } }))}
+                      onError={() => setRowStatus((items) => ({ ...items, [activeSong.id]: { tone: "error", message: "播放器载入失败，请检查视频是否允许嵌入。" } }))}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="admin-manual-divider"><span>STEP 2 · 确认链接</span><small>也可以直接粘贴手动找到的 URL</small></div>
 
               <label className="admin-url-field">
                 YouTube URL 或 11 位视频 ID
@@ -335,9 +487,7 @@ export default function AdminApp() {
               <div className="admin-editor-actions">
                 <button className="primary-inline" onClick={() => assign(activeSong.id)}><Save size={16} />保存并试听</button>
                 <button className="primary-inline save-next" onClick={() => assign(activeSong.id, true)}><SkipForward size={16} />保存并下一首</button>
-                <button className="ghost-action" onClick={() => autoMatch(activeSong)} disabled={matchingId === activeSong.id}><WandSparkles size={16} />{matchingId === activeSong.id ? "匹配中…" : "自动找候选"}</button>
-                {candidateSource ? <button className="ghost-action" onClick={() => setPreview(preview === activeSong.id ? null : activeSong.id)}><Play size={16} />{preview === activeSong.id ? "收起候选" : "试听候选"}</button> : null}
-                <a className="ghost-action" href={youtubeSearchUrl(activeSong)} target="_blank" rel="noreferrer"><ExternalLink size={16} />打开 YouTube 搜索</a>
+                {candidateSource ? <button className="ghost-action" onClick={() => setPreviewSource(previewSource?.videoId === candidateSource.videoId ? null : candidateSource)}><Play size={16} />{previewSource?.videoId === candidateSource.videoId ? "收起试听" : "试听链接"}</button> : null}
               </div>
 
               <p className="admin-shortcuts">Enter 保存并试听 · Ctrl / ⌘ + Enter 保存并进入下一首</p>
@@ -346,27 +496,14 @@ export default function AdminApp() {
               {activeSource ? (
                 <div className="admin-current-source">
                   <div><span>当前映射</span><code>{activeSource.videoId}{activeSource.start ? ` · ${activeSource.start}s` : ""}</code></div>
-                  <button className="ghost-action" onClick={() => setPreview(preview === activeSong.id ? null : activeSong.id)}><Play size={15} />{preview === activeSong.id ? "收起试听" : "试听当前源"}</button>
+                  <button className="ghost-action" onClick={() => setPreviewSource(previewSource?.videoId === activeSource.videoId ? null : activeSource)}><Play size={15} />{previewSource?.videoId === activeSource.videoId ? "收起试听" : "试听当前源"}</button>
                   <button className="ghost-action danger-action" onClick={() => remove(activeSong.id)}><Trash2 size={15} />删除映射</button>
-                </div>
-              ) : null}
-
-              {candidateSource && preview === activeSong.id ? (
-                <div className="yt-frame admin-frame">
-                  <iframe
-                    src={youtubeEmbedUrl(candidateSource)}
-                    title={activeSong.title}
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                    onLoad={() => setRowStatus((items) => ({ ...items, [activeSong.id]: { tone: "success", message: "播放器已载入，请确认音源与歌曲一致。" } }))}
-                    onError={() => setRowStatus((items) => ({ ...items, [activeSong.id]: { tone: "error", message: "播放器载入失败，请检查视频是否允许嵌入。" } }))}
-                  />
                 </div>
               ) : null}
 
               <details className="admin-api-panel">
                 <summary><WandSparkles size={16} />自动匹配设置（可选）</summary>
-                <label>YouTube Data API Key 仅保存在当前标签页。由于搜索 API 配额较高，不建议一次自动跑完整曲库。<input type="password" autoComplete="off" placeholder="不填写时直接打开 YouTube 搜索" value={apiKey} onChange={(event) => saveApiKey(event.target.value)} /></label>
+                <label>YouTube Data API Key 仅保存在当前标签页。每次搜索会消耗 YouTube Search API 配额，因此不会自动批量跑完整曲库。<input type="password" autoComplete="off" placeholder="不填写时直接打开 YouTube 搜索" value={apiKey} onChange={(event) => saveApiKey(event.target.value)} /></label>
               </details>
 
               <details className="admin-bulk-panel">
@@ -423,6 +560,67 @@ function buildSearchQuery(song: Song) {
   return `${song.title} ${song.artist} maimai`;
 }
 
-function youtubeSearchUrl(song: Song) {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(buildSearchQuery(song))}`;
+function searchPresets(song: Song) {
+  return [
+    { label: "曲名 + 歌手", query: `${song.title} ${song.artist}` },
+    { label: "maimai 音源", query: `${song.title} ${song.artist} maimai` },
+    { label: "官方 / Topic", query: `${song.title} ${song.artist} official topic` }
+  ];
+}
+
+function youtubeSearchUrl(song: Song, query = buildSearchQuery(song)) {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query.trim() || buildSearchQuery(song))}`;
+}
+
+function scoreCandidate(song: Song, candidate: Pick<MatchCandidate, "title" | "channelTitle">) {
+  const title = normalizeForMatch(candidate.title);
+  const channel = normalizeForMatch(candidate.channelTitle);
+  const songTitle = normalizeForMatch(song.title);
+  const artist = normalizeForMatch(song.artist);
+  let score = 0;
+
+  if (songTitle && title.includes(songTitle)) score += 52;
+  else score += overlapScore(songTitle, title, 34);
+
+  if (artist && `${title} ${channel}`.includes(artist)) score += 28;
+  else score += overlapScore(artist, `${title} ${channel}`, 18);
+
+  if (/maimai|舞萌|でらっくす/.test(title)) score += 10;
+  if (/official|topic|sega|maimai/.test(`${title} ${channel}`)) score += 8;
+  if (/音源|original|soundtrack|ost/.test(title)) score += 5;
+  if (/譜面|gameplay|手元|ap\+?|full combo|創作|chart|外部出力/.test(title)) score -= 14;
+  if (/shorts|切り抜き|reaction|解説|実況/.test(title)) score -= 12;
+  return score;
+}
+
+function overlapScore(expected: string, candidate: string, max: number) {
+  const tokens = expected.split(" ").filter((token) => token.length > 1);
+  if (!tokens.length) return 0;
+  const matches = tokens.filter((token) => candidate.includes(token)).length;
+  return Math.round((matches / tokens.length) * max);
+}
+
+function normalizeForMatch(value: string) {
+  return normalize(value)
+    .normalize("NFKC")
+    .replace(/[\s\-_~～・:：/／()[\]【】「」『』'"“”]+/g, " ")
+    .trim();
+}
+
+function confidenceLabel(score: number) {
+  if (score >= 78) return "高度匹配";
+  if (score >= 52) return "较匹配";
+  return "需核对";
+}
+
+function confidenceClass(score: number) {
+  if (score >= 78) return "high";
+  if (score >= 52) return "medium";
+  return "low";
+}
+
+function decodeEntities(value: string) {
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = value;
+  return textarea.value;
 }
