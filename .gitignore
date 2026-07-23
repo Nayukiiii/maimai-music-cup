@@ -5,6 +5,8 @@ dist/
 .env
 .env.*
 asset-sources.json
+youtubeCandidates.json
+youtubeCandidates.json.tmp
 deploy/.htpasswd
 npm-debug.log*
 .DS_Store

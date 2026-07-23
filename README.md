@@ -131,8 +131,10 @@ Admin 支持：
 - 按曲名 / 歌手 / song ID 搜索，并筛选全部、已映射或未映射歌曲；支持 25 / 50 / 100 首分页。
 - 手动粘贴 YouTube URL / 视频 ID，保存后立即试听，或“保存并下一首”连续处理。
 - 支持 Enter 保存、Ctrl / Command + Enter 保存并进入下一首，以及一键跳到下一首未匹配歌曲。
-- 按 `曲名 + 歌手 + maimai` 自动匹配；填写 YouTube Data API Key 时请求首条候选，不填写时打开 YouTube 搜索页。
-- 自动匹配只填入候选，不会直接保存；可先试听确认，避免错误覆盖。
+- 可编辑搜索关键词，并一键切换“曲名 + 歌手”“maimai 音源”“官方 / Topic”三种搜索模板。
+- 填写 YouTube Data API Key 时一次取得最多 8 条结果，按曲名、歌手、官方音源特征排序后展示前 6 个候选；不填写时使用当前关键词打开 YouTube 搜索页。
+- 候选可逐条试听、选用或“确认并下一首”；不会静默采用第一条结果，并会提示同一视频是否已被其他歌曲使用。
+- 在“仅未匹配”队列中保存后仍停留在当前歌曲供试听核对，只有点击“保存并下一首”才会继续推进。
 - API Key 只放在当前浏览器标签页的 `sessionStorage`，不会写入源码、JSON 或构建产物。
 - 自动保存 `localStorage` 草稿，并显示待导出变更数。
 - 支持按 `songId + URL` 或 `曲名 + 歌手 + URL` 的制表符格式批量粘贴映射。
@@ -140,6 +142,50 @@ Admin 支持：
 - 导出结果固定为格式化的 `youtubeSources.json`；Admin 不会直接写服务器文件。
 
 顶部「预览下一首」会在当前搜索和筛选范围内顺序检查已映射音源。需要放弃未导出改动时，可用「放弃草稿」恢复到当前构建版本。
+
+### 一千首以上曲库的快速审核
+
+YouTube Data API 的默认 `search.list` 搜索额度不足以一次处理完整曲库。大曲库推荐先在本地用 `yt-dlp` 生成候选元数据包，再导入 Admin 连续审核。该命令只读取搜索结果的标题、频道、缩略图和视频 ID，不下载视频或音频。
+
+先安装并确认 `yt-dlp` 可用：
+
+```bash
+# Windows 也可以使用：py -m pip install -U yt-dlp
+python3 -m pip install -U yt-dlp
+yt-dlp --version
+```
+
+在项目根目录生成候选包：
+
+```bash
+npm run candidates:generate
+```
+
+默认行为：
+
+- 只扫描 `youtubeSources.json` 中尚未映射的歌曲。
+- 每首歌生成 5 个候选，默认请求间隔 900ms。
+- 结果保存为被 `.gitignore` 排除的 `youtubeCandidates.json`。
+- 每处理一首就写入检查点；按 `Ctrl+C` 中断后重新运行同一命令会自动跳过已完成歌曲。
+- 搜索失败的歌曲保留在错误记录中，下次运行会自动重试。
+
+需要分批处理时：
+
+```bash
+npm run candidates:generate -- --limit 200 --offset 0
+npm run candidates:generate -- --limit 200 --offset 200
+```
+
+生成完成后进入 `/admin`：
+
+1. 点击「导入候选包」，选择 `youtubeCandidates.json`。
+2. 状态切到「候选待审核」。
+3. 默认按最高候选匹配度排序，先快速清理高置信歌曲；也可以切换为“需核对优先”或曲库顺序。
+4. 使用数字键 `1–6` 选择候选，`Space` 试听，`Enter` 确认并进入下一首，`S` 暂时跳过。
+5. 集中处理「无候选」和「已跳过」队列。
+6. 最后导出 `youtubeSources.json` 并重新构建部署。
+
+候选包与跳过进度保存在当前浏览器的 `localStorage` 中，不会上传到服务器，也不会写进前端构建产物。
 
 导出后生效流程：
 
