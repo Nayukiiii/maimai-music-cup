@@ -12,13 +12,17 @@ export interface Chart {
 
 export interface Song {
   id: string;
+  rawMusicId?: string;
+  assetId?: string;
   title: string;
   artist: string;
   category: string;
   version: string;
+  versionId?: number | null;
   jacket: string;
   previewAudio?: string;
   bpm: number;
+  chartType?: "standard" | "dx";
   charts: Chart[];
 }
 

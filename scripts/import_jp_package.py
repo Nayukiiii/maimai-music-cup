@@ -27,6 +27,47 @@ CHART_SUFFIXES = {
     "03": "Master",
     "04": "Re:Master",
 }
+VERSION_MAJOR_TITLES = [
+    (10000, "maimai"),
+    (11000, "maimai PLUS"),
+    (12000, "GreeN"),
+    (13000, "GreeN PLUS"),
+    (14000, "ORANGE"),
+    (15000, "ORANGE PLUS"),
+    (16000, "PiNK"),
+    (17000, "PiNK PLUS"),
+    (18000, "MURASAKi"),
+    (18500, "MURASAKi PLUS"),
+    (19000, "MiLK"),
+    (19500, "MiLK PLUS"),
+    (19900, "FiNALE"),
+    (20000, "maimai DX"),
+    (20500, "maimai DX PLUS"),
+    (21000, "Splash"),
+    (21500, "Splash PLUS"),
+    (22000, "UNiVERSE"),
+    (22500, "UNiVERSE PLUS"),
+    (23000, "FESTiVAL"),
+    (23500, "FESTiVAL PLUS"),
+    (24000, "BUDDiES"),
+    (24500, "BUDDiES PLUS"),
+    (25000, "PRiSM"),
+    (25500, "PRiSM PLUS"),
+    (26000, "CiRCLE"),
+    (26500, "CiRCLE PLUS"),
+]
+VERSION_DISPLAY_ALIASES = {
+    "maimaDX": "maimai DX",
+    "maimaDXPLUS": "maimai DX PLUS",
+    "MiLKPLUS": "MiLK PLUS",
+    "MURASAKiPLUS": "MURASAKi PLUS",
+    "SplashPLUS": "Splash PLUS",
+    "UNiVERSEPLUS": "UNiVERSE PLUS",
+    "FESTiVALPLUS": "FESTiVAL PLUS",
+    "BUDDiESPLUS": "BUDDiES PLUS",
+    "PRiSMPLUS": "PRiSM PLUS",
+    "CiRCLEPLUS": "CiRCLE PLUS",
+}
 
 
 def main() -> int:
@@ -42,7 +83,12 @@ def main() -> int:
     parser.add_argument(
         "--include-preview-placeholders",
         action="store_true",
-        help="Write previewAudio paths before MP3 previews have actually been generated.",
+        help="Compatibility flag. previewAudio is now written by default when a matching audio container exists.",
+    )
+    parser.add_argument(
+        "--no-preview-audio",
+        action="store_true",
+        help="Do not write previewAudio paths into the exported song JSON.",
     )
     parser.add_argument(
         "--keep-zero-level-charts",
@@ -99,18 +145,24 @@ def main() -> int:
         jacket_path = f"{args.jacket_web_dir}/ui_jacket_{asset_id}{jacket_ext}"
         preview_mp3 = f"{args.preview_web_dir}/music{asset_id}.mp3"
         title = parsed["title"] or f"music{raw_id}"
+        version_id = read_int(parsed["version"])
+        version_title = version_title_for(parsed["version"], version_map)
 
         song = {
             "id": song_id,
+            "rawMusicId": raw_id,
+            "assetId": asset_id,
             "title": title,
             "artist": parsed["artist"] or args.fallback_artist,
             "category": parsed["category"] or "未分类",
-            "version": version_map.get(parsed["version"], parsed["version"]) or "日服",
+            "version": version_title,
+            "versionId": version_id,
             "jacket": jacket_path,
             "bpm": parsed["bpm"] or 0,
+            "chartType": chart_type,
             "charts": charts,
         }
-        if args.include_preview_placeholders and (acb.exists() or awb.exists()):
+        if not args.no_preview_audio and (acb.exists() or awb.exists()):
             song["previewAudio"] = preview_mp3
         songs.append(song)
 
@@ -120,6 +172,12 @@ def main() -> int:
             "assetId": asset_id,
             "title": title,
             "artist": parsed["artist"] or args.fallback_artist,
+            "category": parsed["category"] or "未分类",
+            "version": version_title,
+            "versionId": str(version_id or ""),
+            "bpm": str(parsed["bpm"] or 0),
+            "chartType": chart_type,
+            "chartCount": str(len(charts)),
             "musicXml": rel(xml_path, package_root),
             "musicDir": rel(xml_path.parent, package_root),
             "jacketBundle": rel(jacket_bundle, package_root) if jacket_bundle.exists() else "",
@@ -177,7 +235,9 @@ def parse_music_xml(path: Path, chart_type: str) -> dict[str, Any]:
             "genrename/str", "genre/str", "category/str", "genrename", "genre", "category",
         ]),
         "version": first_text(text_index, [
-            "version/str", "versionname/str", "releaseversion/str", "version", "addversion/str",
+            "musicversion/str", "versionname/str", "version/str", "addversion/str",
+            "musicversion/id", "version/id", "addversion/id",
+            "musicversion", "version", "addversion",
         ]),
         "bpm": parse_bpm(first_text(text_index, ["bpm", "bpmmax", "bpm_max"])),
         "charts": charts,
@@ -218,6 +278,36 @@ def load_music_version_map(base: Path) -> dict[str, str]:
         for number in numeric_candidates:
             version_map[str(number)] = name
     return version_map
+
+
+def version_title_for(raw_value: str, version_map: dict[str, str]) -> str:
+    raw = clean(raw_value)
+    if not raw:
+        return "日服"
+
+    mapped = version_map.get(raw)
+    if mapped:
+        return normalize_version_title(mapped)
+
+    number = read_int(raw)
+    if number is None:
+        return normalize_version_title(raw)
+
+    if str(number) in version_map:
+        return normalize_version_title(version_map[str(number)])
+
+    title = "日服"
+    for threshold, candidate in VERSION_MAJOR_TITLES:
+        if number >= threshold:
+            title = candidate
+        else:
+            break
+    return title
+
+
+def normalize_version_title(value: str) -> str:
+    title = clean(value)
+    return VERSION_DISPLAY_ALIASES.get(title, title or "日服")
 
 
 def parse_notes(root: ET.Element, chart_type: str) -> list[dict[str, Any]]:
@@ -416,6 +506,12 @@ def write_manifest(path: Path, rows: list[dict[str, str]]) -> None:
         "assetId",
         "title",
         "artist",
+        "category",
+        "version",
+        "versionId",
+        "bpm",
+        "chartType",
+        "chartCount",
         "musicXml",
         "musicDir",
         "jacketBundle",
