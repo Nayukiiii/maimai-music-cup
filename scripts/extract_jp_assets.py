@@ -146,7 +146,7 @@ def extract_previews(package_root: Path, site_root: Path, rows: list[dict[str, s
 
     done = skipped = failed = 0
     for row in unique:
-        source_rel = row.get("audioAcb") or row.get("audioAwb")
+        source_rel = row.get("audioAwb") or row.get("audioAcb")
         out_web = row.get("expectedPreviewMp3")
         if not source_rel or not out_web:
             skipped += 1
