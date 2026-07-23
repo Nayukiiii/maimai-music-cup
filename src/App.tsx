@@ -745,23 +745,32 @@ function StageHeader({
 
 function StageIntro({ intro }: { intro: ReturnType<typeof getStageIntro> }) {
   const [visible, setVisible] = useState(Boolean(intro));
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     setVisible(Boolean(intro));
+    setLeaving(false);
     if (!intro) return;
-    const timer = window.setTimeout(() => setVisible(false), intro.variant === "champion" ? 6200 : 5000);
-    return () => window.clearTimeout(timer);
+    const duration = intro.variant === "champion" ? 6400 : 5200;
+    const leaveTimer = window.setTimeout(() => setLeaving(true), duration - 520);
+    const hideTimer = window.setTimeout(() => setVisible(false), duration);
+    return () => {
+      window.clearTimeout(leaveTimer);
+      window.clearTimeout(hideTimer);
+    };
   }, [intro?.key]);
 
   if (!intro || !visible) return null;
 
   return (
-    <div className={`stage-intro intro-${intro.variant}`} key={intro.key} role="status" aria-live="polite">
+    <div className={`stage-intro intro-${intro.variant} ${leaving ? "is-leaving" : ""}`} key={intro.key} role="status" aria-live="polite">
       <div className="stage-intro-inner">
+        <span className="stage-intro-orbit" aria-hidden="true" />
         <span className="stage-intro-en">{intro.en}</span>
         <strong className="stage-intro-title">{intro.title}</strong>
         <span className="stage-intro-desc">{intro.desc}</span>
         <button type="button" className="intro-skip" onClick={() => setVisible(false)}>进入本轮</button>
+        <span className="stage-intro-timer" aria-hidden="true" />
       </div>
     </div>
   );

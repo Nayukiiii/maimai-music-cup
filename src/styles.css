@@ -4291,3 +4291,206 @@ h1 {
     font-size: 0.7rem;
   }
 }
+
+/* Desktop bracket density */
+@media (min-width: 521px) {
+  .bracket-panel .duel-zone {
+    grid-template-columns: repeat(2, minmax(0, 360px));
+    justify-content: center;
+    width: min(760px, 100%);
+    margin-inline: auto;
+    gap: 28px;
+  }
+
+  .bracket-panel .duel-slot {
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .bracket-panel .song-card.duel {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .bracket-panel .song-card.duel .title-line {
+    font-size: clamp(1.05rem, 1.35vw, 1.32rem);
+    line-height: 1.12;
+  }
+
+  .bracket-panel .song-card.duel .artist-line {
+    font-size: 0.82rem;
+  }
+
+  .bracket-panel .song-card.duel .pill,
+  .bracket-panel .song-card.duel .difficulty,
+  .bracket-panel .song-card.duel .chart-stat,
+  .bracket-panel .song-card.duel .designer,
+  .bracket-panel .song-card.duel .chart-constant {
+    font-size: 0.66rem;
+  }
+
+  .bracket-panel .vs-badge {
+    top: min(42%, 165px);
+    width: 54px;
+    height: 54px;
+    font-size: 0.78rem;
+  }
+}
+
+/* Round ceremony is state-driven so the card cannot fade before its timer. */
+.stage-intro {
+  opacity: 1;
+  animation: intro-overlay-arrive 280ms ease-out both;
+  isolation: isolate;
+}
+
+.stage-intro::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    radial-gradient(circle at 50% 48%, rgba(102, 230, 239, 0.11), transparent 24%),
+    linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.035) 48%, transparent 66%);
+  animation: intro-stage-sweep 2400ms ease-in-out infinite alternate;
+}
+
+.stage-intro .stage-intro-inner {
+  overflow: hidden;
+  opacity: 1;
+  transform: none;
+  animation: intro-card-arrive 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.stage-intro.is-leaving {
+  animation: intro-overlay-leave 520ms ease-in both;
+}
+
+.stage-intro.is-leaving .stage-intro-inner {
+  animation: intro-card-leave 520ms ease-in both;
+}
+
+.stage-intro-orbit {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: -1;
+  width: min(440px, 78vw);
+  aspect-ratio: 1;
+  border: 1px solid rgba(102, 230, 239, 0.16);
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: intro-orbit 5400ms linear infinite;
+}
+
+.stage-intro-orbit::before,
+.stage-intro-orbit::after {
+  position: absolute;
+  border-radius: 50%;
+  content: "";
+}
+
+.stage-intro-orbit::before {
+  inset: 12%;
+  border: 1px dashed rgba(255, 112, 186, 0.2);
+}
+
+.stage-intro-orbit::after {
+  top: -5px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  background: var(--gold);
+  box-shadow: 0 0 18px rgba(255, 224, 121, 0.72);
+}
+
+.stage-intro-timer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--cyan), var(--pink), var(--gold));
+  animation: intro-timer 5200ms linear both;
+}
+
+.intro-champion .stage-intro-timer {
+  animation-duration: 6400ms;
+}
+
+@keyframes intro-overlay-arrive {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes intro-overlay-leave {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes intro-card-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.94);
+    filter: blur(10px);
+  }
+  62% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes intro-card-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-12px) scale(1.015);
+    filter: blur(6px);
+  }
+}
+
+@keyframes intro-stage-sweep {
+  from { transform: translateX(-4%); }
+  to { transform: translateX(4%); }
+}
+
+@keyframes intro-orbit {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes intro-timer {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-intro {
+    display: grid;
+    opacity: 1;
+    animation: none !important;
+  }
+
+  .stage-intro::before,
+  .stage-intro .stage-intro-inner,
+  .stage-intro-orbit {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+    filter: none;
+  }
+
+  .stage-intro-orbit,
+  .stage-intro-timer {
+    display: none;
+  }
+}
