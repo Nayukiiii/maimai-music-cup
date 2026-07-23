@@ -57,6 +57,10 @@ VERSION_MAJOR_TITLES = [
     (26500, "CiRCLE PLUS"),
 ]
 VERSION_DISPLAY_ALIASES = {
+    "maimaiPLUS": "maimai PLUS",
+    "GreeNPLUS": "GreeN PLUS",
+    "ORANGEPLUS": "ORANGE PLUS",
+    "PiNKPLUS": "PiNK PLUS",
     "maimaDX": "maimai DX",
     "maimaDXPLUS": "maimai DX PLUS",
     "MiLKPLUS": "MiLK PLUS",
