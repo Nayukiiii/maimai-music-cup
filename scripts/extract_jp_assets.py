@@ -14,7 +14,9 @@ rights to do so.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import csv
+import os
 import shutil
 import subprocess
 import sys
@@ -35,6 +37,7 @@ def main() -> int:
     parser.add_argument("--preview-start", type=float, default=30.0)
     parser.add_argument("--preview-duration", type=float, default=30.0)
     parser.add_argument("--preview-bitrate", default="96k")
+    parser.add_argument("--preview-workers", type=int, default=0, help="Parallel audio workers. Default: auto.")
     parser.add_argument("--jacket-max-size", type=int, default=0, help="Resize jackets so the longest side is at most this size.")
     parser.add_argument("--jacket-quality", type=int, default=86, help="JPEG/WebP quality. Default: 86")
     parser.add_argument("--vgmstream", default="vgmstream-cli")
@@ -144,7 +147,8 @@ def extract_previews(package_root: Path, site_root: Path, rows: list[dict[str, s
     if args.preview_limit:
         unique = unique[: args.preview_limit]
 
-    done = skipped = failed = 0
+    jobs: list[tuple[str, Path, Path]] = []
+    skipped = 0
     for row in unique:
         source_rel = row.get("audioAwb") or row.get("audioAcb")
         out_web = row.get("expectedPreviewMp3")
@@ -157,15 +161,41 @@ def extract_previews(package_root: Path, site_root: Path, rows: list[dict[str, s
             skipped += 1
             continue
         output.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            export_preview(args, source, output)
-            done += 1
-            print(f"预览 {row['assetId']} -> {output}")
-        except Exception as exc:
-            failed += 1
-            print(f"音频失败 {source}: {exc}", file=sys.stderr)
+        jobs.append((row["assetId"], source, output))
+
+    workers = preview_worker_count(args.preview_workers)
+    done = failed = 0
+    total = len(jobs)
+    if total:
+        print(f"音频并行：workers={workers}，待导出={total}，已存在/跳过={skipped}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(export_preview_job, args, asset_id, source, output) for asset_id, source, output in jobs]
+        for index, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+            asset_id, output, error = future.result()
+            if error:
+                failed += 1
+                print(f"[{index}/{total}] 音频失败 {asset_id}: {error}", file=sys.stderr)
+            else:
+                done += 1
+                print(f"[{index}/{total}] 预览 {asset_id} -> {output}")
 
     print(f"音频：导出 {done}，跳过 {skipped}，失败 {failed}")
+
+
+def preview_worker_count(value: int) -> int:
+    if value > 0:
+        return max(1, value)
+    cpu_count = os.cpu_count() or 4
+    return max(1, min(12, cpu_count))
+
+
+def export_preview_job(args: argparse.Namespace, asset_id: str, source: Path, output: Path) -> tuple[str, Path, str | None]:
+    try:
+        export_preview(args, source, output)
+        return asset_id, output, None
+    except Exception as exc:
+        return asset_id, output, str(exc)
 
 
 def export_preview(args: argparse.Namespace, source: Path, output: Path) -> None:
