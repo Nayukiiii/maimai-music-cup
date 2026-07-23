@@ -82,7 +82,6 @@ export default function App() {
     );
   }, [levelOptions]);
   const pool = useMemo(() => toCupEntries(songs, filters), [filters]);
-  const uniquePoolSongs = useMemo(() => new Set(pool.map((entry) => entry.songId)).size, [pool]);
   const uniquePoolEntries = useMemo(() => new Set(pool.map((entry) => entry.id)).size, [pool]);
   const canStart = uniquePoolEntries >= 48;
   const modeLabel = cupModeLabel(filters.mode);
@@ -90,7 +89,7 @@ export default function App() {
     filters.mode === "chart"
       ? `${filters.difficulties[0] ?? "Expert"} / ${filters.rangeMode === "level" ? `Lv ${filters.minLevel}–${filters.maxLevel}` : `定数 ${filters.minConstant.toFixed(1)}–${filters.maxConstant.toFixed(1)}`}`
       : "歌曲本体 · 不区分难度";
-  const cupMeta = `${modeLabel} / ${usingImportedSongs ? "CN 曲库" : "Mock 曲库"} / Seed ${filters.seed || "maimai-cup"}`;
+  const cupMeta = `${modeLabel} / ${usingImportedSongs ? "JP 曲库" : "Mock 曲库"} / Seed ${filters.seed || "maimai-cup"}`;
   const transitionKey = `${phase}-${roundEntries.length}`;
   const currentGroup = groups[groupIndex] ?? [];
   const currentRoundName = getRoundName(roundEntries.length);
@@ -290,7 +289,7 @@ export default function App() {
           <h1>舞萌本命之巅</h1>
           <div className="cup-context">
             <span>{modeLabel}</span>
-            <span>{usingImportedSongs ? "CN 曲库" : "Mock 曲库"}</span>
+            <span>{usingImportedSongs ? "JP 曲库" : "Mock 曲库"}</span>
             <span>{difficultyModeText}</span>
           </div>
         </div>
@@ -496,12 +495,6 @@ export default function App() {
               <Dices size={20} />
               开始抽签 48 强
             </button>
-            <p className={`pool-status ${canStart ? "ok" : "bad"}`}>
-              {filters.mode === "song"
-                ? `当前可参赛歌曲 ${uniquePoolEntries} 首，需要至少 48 首`
-                : `当前可参赛谱面 ${uniquePoolEntries} 张，来自 ${uniquePoolSongs} 首歌，需要至少 48 张`}
-              {` / ${usingImportedSongs ? "CN 曲库" : "Mock 曲库"}`}
-            </p>
             {drawError ? <p className="form-error" role="alert">{drawError}</p> : null}
           </div>
 
