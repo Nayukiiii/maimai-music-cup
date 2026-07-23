@@ -822,9 +822,9 @@ function SharePoster({
           <p>{champion.artist}</p>
           {champion.chart ? (
             <div className="champion-chart">
-              {champion.chart.difficulty} / Lv {champion.chart.level}
+              {champion.chart.difficulty} / {chartTypeLabel(champion.chart.type, champion.songId)} / Lv {champion.chart.level}
               {typeof champion.chart.constant === "number" ? ` / 定数 ${champion.chart.constant.toFixed(1)}` : ""}
-              {champion.chart.type && champion.chart.type !== "dx" ? ` / ${champion.chart.type.toUpperCase()}` : ""}
+              {champion.chart.designer ? ` / 谱师 ${champion.chart.designer}` : ""}
             </div>
           ) : null}
           {runnerUp ? (
@@ -1007,6 +1007,13 @@ function phaseLabel(phase: Phase) {
 
 function cupModeLabel(mode: CupFilters["mode"]) {
   return mode === "song" ? "歌曲杯" : "谱面杯";
+}
+
+function chartTypeLabel(type: string | undefined, songId: string) {
+  if (type === "standard") return "SD谱";
+  if (type === "dx") return "DX谱";
+  if (/^jp-00\d+/.test(songId)) return "SD谱";
+  return "DX谱";
 }
 
 type IntroVariant = "normal" | "semi" | "final" | "champion";

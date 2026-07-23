@@ -1,4 +1,4 @@
-import { Check, Disc3, Gauge, Sparkles, Volume2 } from "lucide-react";
+import { Check, Disc3, Volume2 } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { getYouTubeSource } from "../data/youtube";
 import { CupEntry } from "../types";
@@ -29,7 +29,7 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
   const designer = entry.chart?.designer?.trim();
   const showDesigner = Boolean(designer) && !PLACEHOLDER_DESIGNERS.has(designer!.toLowerCase());
   const chartType = entry.chart?.type;
-  const showType = Boolean(chartType) && chartType !== "dx";
+  const chartTypeLabel = entry.chart ? getChartTypeLabel(chartType, entry.songId) : "";
   const showBpm = Boolean(entry.bpm) && entry.bpm > 0;
   const ytSource = getYouTubeSource(entry.songId);
 
@@ -68,21 +68,24 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
 
       {entry.chart ? (
         <span className="chart-panel">
-          <span className={`difficulty ${difficultyClass[difficulty ?? ""]}`}>{difficulty}</span>
-          <span className="chart-stat">
-            <Gauge size={14} />
-            Lv {entry.chart.level}
-            {showType ? ` / ${chartType!.toUpperCase()}` : ""}
+          <span className="chart-headline">
+            <span className={`difficulty ${difficultyClass[difficulty ?? ""]}`}>{difficulty}</span>
+            <span className="chart-type-badge">{chartTypeLabel}</span>
           </span>
-          {typeof entry.chart.constant === "number" ? (
-            <span className="chart-constant">定数 {entry.chart.constant.toFixed(1)}</span>
-          ) : null}
-          {showDesigner ? (
-            <span className="designer">
-              <Sparkles size={14} />
-              {designer}
+          <span className="chart-spec-grid">
+            <span className="chart-spec">
+              <small>等级</small>
+              <b>Lv {entry.chart.level}</b>
             </span>
-          ) : null}
+            <span className="chart-spec">
+              <small>定数</small>
+              <b>{typeof entry.chart.constant === "number" ? entry.chart.constant.toFixed(1) : "缺失"}</b>
+            </span>
+            <span className="chart-spec designer-spec">
+              <small>谱师</small>
+              <b>{showDesigner ? designer : "maimaiNET"}</b>
+            </span>
+          </span>
         </span>
       ) : (
         <span className="song-stats">{showBpm ? `BPM ${entry.bpm}` : `${entry.category} · ${entry.version}`}</span>
@@ -101,6 +104,19 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
       {ytSource && mode !== "compact" ? <YouTubePreview source={ytSource} title={entry.title} /> : null}
     </article>
   );
+}
+
+function getChartTypeLabel(type: string | undefined, songId: string) {
+  if (type === "standard") {
+    return "SD谱";
+  }
+  if (type === "dx") {
+    return "DX谱";
+  }
+  if (/^jp-00\d+/.test(songId)) {
+    return "SD谱";
+  }
+  return "DX谱";
 }
 
 function handleKeyDown(event: KeyboardEvent<HTMLElement>, clickable: boolean, onSelect: () => void) {

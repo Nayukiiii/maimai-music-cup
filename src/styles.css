@@ -741,8 +741,28 @@ button:not(:disabled):hover,
 
 .chart-panel {
   display: grid;
-  gap: 7px;
+  gap: 9px;
   margin-top: auto;
+}
+
+.chart-headline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.chart-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid rgba(255, 212, 121, 0.3);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--gold);
+  background: rgba(255, 212, 121, 0.1);
+  font-size: 0.74rem;
+  font-weight: 950;
 }
 
 .difficulty {
@@ -785,6 +805,50 @@ button:not(:disabled):hover,
   color: #d8e7f3;
   font-size: 0.82rem;
   font-weight: 850;
+}
+
+.chart-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.chart-spec {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 7px 8px;
+}
+
+.chart-spec small,
+.chart-spec b {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-spec small {
+  margin-bottom: 3px;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+.chart-spec b {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.chart-spec:nth-child(2) b {
+  color: var(--cyan);
+}
+
+.designer-spec {
+  grid-column: span 1;
 }
 
 .chart-constant {
@@ -841,8 +905,19 @@ button:not(:disabled):hover,
 .song-card.compact .pill,
 .song-card.compact .chart-stat,
 .song-card.compact .designer,
-.song-card.compact .chart-constant {
+.song-card.compact .chart-constant,
+.song-card.compact .chart-type-badge,
+.song-card.compact .chart-spec small,
+.song-card.compact .chart-spec b {
   font-size: 0.7rem;
+}
+
+.song-card.compact .chart-spec-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.song-card.compact .designer-spec {
+  grid-column: 1 / -1;
 }
 
 .song-card.duel {
@@ -3402,7 +3477,7 @@ button:not(:disabled):hover,
 
 .asset-chart-row {
   display: grid;
-  grid-template-columns: 130px 90px 90px minmax(160px, 1fr) 80px;
+  grid-template-columns: 132px 88px 92px minmax(220px, 1fr) 86px;
   align-items: center;
   gap: 10px;
   min-height: 44px;
@@ -3424,6 +3499,28 @@ button:not(:disabled):hover,
 
 .asset-chart-row strong {
   color: var(--yellow);
+}
+
+.asset-chart-designer {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 900;
+}
+
+.asset-chart-type {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 212, 121, 0.3);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--gold);
+  background: rgba(255, 212, 121, 0.1);
+  font-weight: 950;
 }
 
 .asset-note-card label {
@@ -4583,9 +4680,27 @@ h1 {
   .duel-zone .difficulty,
   .duel-zone .chart-stat,
   .duel-zone .designer,
-  .duel-zone .chart-constant {
+  .duel-zone .chart-constant,
+  .duel-zone .chart-type-badge {
     min-height: 22px;
     padding: 4px 6px;
+    font-size: 0.58rem;
+  }
+
+  .duel-zone .chart-spec-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .duel-zone .designer-spec {
+    grid-column: 1 / -1;
+  }
+
+  .duel-zone .chart-spec {
+    padding: 5px 6px;
+  }
+
+  .duel-zone .chart-spec small,
+  .duel-zone .chart-spec b {
     font-size: 0.58rem;
   }
 
@@ -4853,7 +4968,10 @@ h1 {
   .bracket-panel .song-card.duel .difficulty,
   .bracket-panel .song-card.duel .chart-stat,
   .bracket-panel .song-card.duel .designer,
-  .bracket-panel .song-card.duel .chart-constant {
+  .bracket-panel .song-card.duel .chart-constant,
+  .bracket-panel .song-card.duel .chart-type-badge,
+  .bracket-panel .song-card.duel .chart-spec small,
+  .bracket-panel .song-card.duel .chart-spec b {
     font-size: 0.66rem;
   }
 

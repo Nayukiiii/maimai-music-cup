@@ -75,13 +75,14 @@ def main() -> int:
 
         asset_id = asset_id_for(raw_id)
         try:
-            parsed = parse_music_xml(xml_path)
+            chart_type = infer_chart_type(raw_id)
+            parsed = parse_music_xml(xml_path, chart_type)
         except ET.ParseError as exc:
             warnings.append(f"XML 解析失败：{xml_path}：{exc}")
             continue
 
         ma2_paths = sorted(xml_path.parent.glob("*.ma2"))
-        charts = parsed["charts"] or charts_from_ma2(ma2_paths)
+        charts = parsed["charts"] or charts_from_ma2(ma2_paths, chart_type)
         if not args.keep_zero_level_charts:
             charts = [chart for chart in charts if chart.get("level") != "0" and chart.get("constant") != 0]
         if not charts:
@@ -157,13 +158,13 @@ def main() -> int:
     return 0
 
 
-def parse_music_xml(path: Path) -> dict[str, Any]:
+def parse_music_xml(path: Path, chart_type: str) -> dict[str, Any]:
     root = ET.parse(path).getroot()
     text_index = build_text_index(root)
 
-    charts = parse_notes(root)
+    charts = parse_notes(root, chart_type)
     if not charts:
-        charts = parse_notes_from_index(text_index)
+        charts = parse_notes_from_index(text_index, chart_type)
 
     return {
         "title": first_text(text_index, [
@@ -219,7 +220,7 @@ def load_music_version_map(base: Path) -> dict[str, str]:
     return version_map
 
 
-def parse_notes(root: ET.Element) -> list[dict[str, Any]]:
+def parse_notes(root: ET.Element, chart_type: str) -> list[dict[str, Any]]:
     notes = [node for node in root.iter() if strip_ns(node.tag).lower() in {"notes", "notesdata"}]
     charts = []
     for index, node in enumerate(notes):
@@ -243,6 +244,7 @@ def parse_notes(root: ET.Element) -> list[dict[str, Any]]:
             "difficulty": difficulty,
             "level": display_level,
             "designer": designer,
+            "type": chart_type,
         }
         if constant is not None:
             chart["constant"] = constant
@@ -251,7 +253,7 @@ def parse_notes(root: ET.Element) -> list[dict[str, Any]]:
     return dedupe_charts(charts)
 
 
-def parse_notes_from_index(text_index: dict[str, list[str]]) -> list[dict[str, Any]]:
+def parse_notes_from_index(text_index: dict[str, list[str]], chart_type: str) -> list[dict[str, Any]]:
     levels = text_index.get("level", [])
     decimals = text_index.get("leveldecimal", []) or text_index.get("level_decimal", [])
     designers = text_index.get("notesdesigner/str", []) or text_index.get("designer/str", [])
@@ -263,6 +265,7 @@ def parse_notes_from_index(text_index: dict[str, list[str]]) -> list[dict[str, A
             "difficulty": DIFFICULTIES[index],
             "level": normalize_level(level, level_int, level_decimal) or level or "?",
             "designer": designers[index] if index < len(designers) and designers[index] else "maimaiNET",
+            "type": chart_type,
         }
         constant = make_constant(level_int, level_decimal)
         if constant is not None:
@@ -271,7 +274,7 @@ def parse_notes_from_index(text_index: dict[str, list[str]]) -> list[dict[str, A
     return dedupe_charts(charts)
 
 
-def charts_from_ma2(paths: list[Path]) -> list[dict[str, Any]]:
+def charts_from_ma2(paths: list[Path], chart_type: str) -> list[dict[str, Any]]:
     charts = []
     for path in paths:
         match = re.search(r"_(\d\d)(?:_[LR])?\.ma2$", path.name, re.IGNORECASE)
@@ -284,6 +287,7 @@ def charts_from_ma2(paths: list[Path]) -> list[dict[str, Any]]:
             "difficulty": difficulty,
             "level": "?",
             "designer": "maimaiNET",
+            "type": chart_type,
         })
     return dedupe_charts(charts)
 
@@ -350,6 +354,13 @@ def asset_id_for(raw_id: str) -> str:
     # JP package music folders may use prefixes such as 011820/111634 while
     # jackets and SoundData use the playable low 4 digits, padded to 6.
     return f"{int(raw_id) % 10000:06d}"
+
+
+def infer_chart_type(raw_id: str) -> str:
+    # In the JP package, classic Standard charts normally live under 00xxxx.
+    # 01xxxx and higher entries are DX-era charts or special variants that use
+    # DX assets/audio numbering by the low 4 digits.
+    return "standard" if raw_id.startswith("00") else "dx"
 
 
 def normalize_level(level_text: str | None, level_int: int | None, level_decimal: int | None) -> str:

@@ -426,12 +426,17 @@ function ChartTable({ charts }: { charts: Chart[] }) {
           <span className={`difficulty ${difficultyClass[chart.difficulty] || ""}`}>{chart.difficulty}</span>
           <b>Lv {chart.level}</b>
           <strong>{typeof chart.constant === "number" ? chart.constant.toFixed(1) : "缺失"}</strong>
-          <span>{chart.designer || "maimaiNET"}</span>
-          <span>{chart.type ? chart.type.toUpperCase() : "DX"}</span>
+          <span className="asset-chart-designer">{chart.designer || "maimaiNET"}</span>
+          <span className="asset-chart-type">{chartTypeLabel(chart.type)}</span>
         </div>
       ))}
     </div>
   );
+}
+
+function chartTypeLabel(type: string | undefined) {
+  if (type === "standard") return "SD谱";
+  return "DX谱";
 }
 
 function StatCard({ label, value, detail, tone }: { label: string; value: number; detail: string; tone?: "ok" | "bad" }) {
