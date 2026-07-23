@@ -12,6 +12,8 @@ data/raw/
 game-file-scan*.json
 jp_asset_tasks.json
 jp_assets_manifest.csv
+public/assets/jackets/jp-db/
+public/assets/previews/jp-db/
 deploy/.htpasswd
 npm-debug.log*
 .DS_Store
