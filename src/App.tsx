@@ -485,10 +485,17 @@ export default function App() {
 
             <details className="advanced-block">
               <summary>高级 · 随机种子</summary>
-              <label className="seed-field">
-                默认已随机；填入相同种子可复现同一届抽签
+              <div className="seed-field">
+                <label htmlFor="cup-seed">默认已随机；填入相同种子可复现同一届抽签</label>
                 <div className="seed-row">
                   <input
+                    id="cup-seed"
+                    name="cup-seed"
+                    type="text"
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={filters.seed}
                     onChange={(event) => setFilters({ ...filters, seed: event.target.value })}
                     placeholder="例如 maimai-cup"
@@ -498,7 +505,7 @@ export default function App() {
                     随机
                   </button>
                 </div>
-              </label>
+              </div>
             </details>
 
             <button className="primary-action" onClick={() => startDraw()} disabled={!canStart}>

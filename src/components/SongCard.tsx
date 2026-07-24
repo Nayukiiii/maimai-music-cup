@@ -1,9 +1,10 @@
 import { Check, Disc3, Pause, Play, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, SyntheticEvent } from "react";
-import { getYouTubeSource } from "../data/youtube";
 import { CupEntry } from "../types";
-import { YouTubePreview } from "./YouTubePreview";
+
+// 全站同时只允许一个试听在放，避免小组赛 4 张卡一起响
+let activePreview: HTMLAudioElement | null = null;
 
 const difficultyClass: Record<string, string> = {
   Basic: "basic",
@@ -35,12 +36,18 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
   const chartType = entry.chart?.type;
   const chartTypeLabel = entry.chart ? getChartTypeLabel(chartType, entry.songId) : "";
   const showBpm = Boolean(entry.bpm) && entry.bpm > 0;
-  const ytSource = getYouTubeSource(entry.songId);
 
   useEffect(() => {
     setAudioFailed(false);
     setAudioPlaying(false);
-    return () => audioRef.current?.pause();
+    return () => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.pause();
+      if (activePreview === audio) {
+        activePreview = null;
+      }
+    };
   }, [entry.previewAudio]);
 
   async function toggleAudioPreview() {
@@ -51,6 +58,10 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
       setAudioPlaying(false);
       return;
     }
+    if (activePreview && activePreview !== audio) {
+      activePreview.pause();
+    }
+    activePreview = audio;
     try {
       await audio.play();
       setAudioPlaying(true);
@@ -149,8 +160,6 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
           本地试听未部署
         </span>
       ) : null}
-
-      {ytSource && mode !== "compact" ? <YouTubePreview source={ytSource} title={entry.title} /> : null}
     </article>
   );
 }

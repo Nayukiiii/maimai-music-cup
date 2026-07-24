@@ -133,13 +133,17 @@ function selectUniqueEntries(entries: CupEntry[], seed: string, count: number) {
   const shuffled = shuffleWithSeed(entries, seed);
   const selected: CupEntry[] = [];
   const usedEntryIds = new Set<string>();
+  // 同一首歌整届只能出现一次：谱面杯里同曲的 SD / DX 同难度谱会各生成一个参赛项，
+  // 不按 songId 去重的话抽签页会出现同名同曲绘的「重复曲目」。
+  const usedSongIds = new Set<string>();
 
   for (const entry of shuffled) {
-    if (usedEntryIds.has(entry.id)) {
+    if (usedEntryIds.has(entry.id) || usedSongIds.has(entry.songId)) {
       continue;
     }
     selected.push(entry);
     usedEntryIds.add(entry.id);
+    usedSongIds.add(entry.songId);
     if (selected.length === count) {
       return selected;
     }
