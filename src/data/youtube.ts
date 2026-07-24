@@ -38,8 +38,16 @@ export function parseYouTube(input: string): YouTubeSource | null {
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) return null;
 
   const t = url.searchParams.get("t") || url.searchParams.get("start");
-  const start = t ? parseInt(t, 10) : NaN;
+  const start = parseYouTubeTime(t);
   return Number.isFinite(start) && start > 0 ? { videoId, start } : { videoId };
+}
+
+function parseYouTubeTime(value: string | null): number {
+  if (!value) return NaN;
+  if (/^\d+$/.test(value)) return Number(value);
+  const match = value.toLowerCase().match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+  if (!match) return NaN;
+  return Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0);
 }
 
 export function youtubeEmbedUrl(src: YouTubeSource, autoplay = true): string {

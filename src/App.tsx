@@ -13,7 +13,7 @@ import {
   Trophy,
   Zap
 } from "lucide-react";
-import type { ReactNode, RefObject } from "react";
+import type { ReactNode, RefObject, SyntheticEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SongCard } from "./components/SongCard";
 import { songs, usingImportedSongs } from "./data/songs";
@@ -21,6 +21,7 @@ import { compareLevel, getRoundName, makeGroups, shuffleWithSeed, toCupEntries }
 import { CupEntry, CupFilters, Difficulty, MatchRecord } from "./types";
 
 type Phase = "config" | "draw" | "groups" | "revival" | "bracket" | "result";
+type CaptureState = "idle" | "working" | "success" | "error";
 
 type BracketSnapshot = {
   roundEntries: CupEntry[];
@@ -59,6 +60,7 @@ export default function App() {
   const [champion, setChampion] = useState<CupEntry | null>(null);
   const [undoStack, setUndoStack] = useState<BracketSnapshot[]>([]);
   const [drawError, setDrawError] = useState("");
+  const [captureState, setCaptureState] = useState<CaptureState>("idle");
   const resultRef = useRef<HTMLDivElement>(null);
 
   const categories = useMemo(() => unique(songs.map((song) => song.category)), []);
@@ -247,21 +249,28 @@ export default function App() {
     if (!resultRef.current) {
       return;
     }
-    const { default: html2canvas } = await import("html2canvas");
-    const canvas = await html2canvas(resultRef.current, {
-      backgroundColor: "#130810",
-      scale: Math.min(window.devicePixelRatio || 2, 3),
-      useCORS: true,
-      logging: false,
-      windowWidth: 1280,
-      onclone: (documentClone) => {
-        documentClone.querySelector(".share-poster")?.classList.add("capture-mode");
-      }
-    });
-    const link = document.createElement("a");
-    link.download = `maimai-cup-${champion?.title ?? "result"}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    setCaptureState("working");
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(resultRef.current, {
+        backgroundColor: "#130810",
+        scale: Math.min(window.devicePixelRatio || 2, 3),
+        useCORS: true,
+        logging: false,
+        windowWidth: 1280,
+        onclone: (documentClone) => {
+          documentClone.querySelector(".share-poster")?.classList.add("capture-mode");
+        }
+      });
+      const link = document.createElement("a");
+      const safeTitle = (champion?.title ?? "result").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 80);
+      link.download = `maimai-cup-${safeTitle}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      setCaptureState("success");
+    } catch {
+      setCaptureState("error");
+    }
   }
 
   function resetAll() {
@@ -279,6 +288,7 @@ export default function App() {
     setChampion(null);
     setUndoStack([]);
     setDrawError("");
+    setCaptureState("idle");
   }
 
   return (
@@ -538,7 +548,7 @@ export default function App() {
                 <div className="group-name">GROUP {String.fromCharCode(65 + index)}</div>
                 {group.map((entry, entryIndex) => (
                   <div className="draw-row" style={{ ["--row-stagger" as string]: `${entryIndex * 45}ms` }} key={entry.id}>
-                    <img src={entry.jacket} alt="" />
+                    <img src={entry.jacket} alt="" onError={useFallbackJacket} />
                     <span>{entry.title}</span>
                     {entry.chart ? <b>{entry.chart.difficulty} · {entry.chart.level}</b> : null}
                   </div>
@@ -661,14 +671,15 @@ export default function App() {
             seed={filters.seed}
           />
           <div className="result-actions">
-            <button className="primary-inline" onClick={downloadShareImage}>
+            <button className="primary-inline" onClick={downloadShareImage} disabled={captureState === "working"}>
               <Camera size={17} />
-              生成分享截图
+              {captureState === "working" ? "正在生成…" : captureState === "success" ? "已生成 PNG" : "生成分享截图"}
             </button>
             <button className="ghost-action" onClick={resetAll}>
               <RefreshCw size={17} />
               重新开始
             </button>
+            {captureState === "error" ? <p className="capture-error" role="alert">截图生成失败，请确认曲绘均已加载后重试。</p> : null}
           </div>
         </section>
       ) : null}
@@ -805,7 +816,7 @@ function SharePoster({
 
         <div className="poster-champion">
           <div className="champion-art">
-            <img src={champion.jacket} alt={`${champion.title} jacket`} />
+            <img src={champion.jacket} alt={`${champion.title} jacket`} onError={useFallbackJacket} />
             <span className="champion-crown">
               <Crown size={22} />
             </span>
@@ -822,7 +833,7 @@ function SharePoster({
           ) : null}
           {runnerUp ? (
             <div className="runner-up">
-              <img src={runnerUp.jacket} alt="" />
+              <img src={runnerUp.jacket} alt="" onError={useFallbackJacket} />
               <span>亚军 · RUNNER-UP<b>{runnerUp.title}</b></span>
             </div>
           ) : null}
@@ -836,7 +847,7 @@ function SharePoster({
           <span>FINAL FOUR · 四强</span>
           {topFour.slice(0, 4).map((entry) => (
             <div className="poster-finisher" key={entry.id}>
-              <img src={entry.jacket} alt="" />
+              <img src={entry.jacket} alt="" onError={useFallbackJacket} />
               <b>{entry.title}</b>
             </div>
           ))}
@@ -900,7 +911,7 @@ function getSideMatches(history: MatchRecord[], round: string, side: "left" | "r
 function MiniEntry({ entry, winner }: { entry: CupEntry; winner?: boolean }) {
   return (
     <div className={`mini-entry ${winner ? "winner" : ""}`}>
-      <img src={entry.jacket} alt="" />
+      <img src={entry.jacket} alt="" onError={useFallbackJacket} />
       <span>{entry.title}</span>
     </div>
   );
@@ -984,6 +995,13 @@ function isNumber(value: number | undefined): value is number {
 
 function randomSeed() {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+function useFallbackJacket(event: SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+  if (!image.src.endsWith("/assets/jacket-fallback.svg")) {
+    image.src = "/assets/jacket-fallback.svg";
+  }
 }
 
 function phaseLabel(phase: Phase) {

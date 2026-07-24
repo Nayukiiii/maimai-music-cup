@@ -1,5 +1,6 @@
 import { Check, Disc3, Volume2 } from "lucide-react";
-import type { KeyboardEvent } from "react";
+import { useState } from "react";
+import type { KeyboardEvent, SyntheticEvent } from "react";
 import { getYouTubeSource } from "../data/youtube";
 import { CupEntry } from "../types";
 import { YouTubePreview } from "./YouTubePreview";
@@ -24,6 +25,7 @@ interface SongCardProps {
 const PLACEHOLDER_DESIGNERS = new Set(["maimainet", "-", "－", "ー", ""]);
 
 export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel, onSelect }: SongCardProps) {
+  const [audioFailed, setAudioFailed] = useState(false);
   const clickable = Boolean(onSelect) && !disabled;
   const difficulty = entry.chart?.difficulty;
   const designer = entry.chart?.designer?.trim();
@@ -44,7 +46,13 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
       onKeyDown={(event) => handleKeyDown(event, clickable, () => onSelect?.(entry))}
     >
       <span className="jacket-wrap">
-        <img src={entry.jacket} alt={`${entry.title} jacket`} className="jacket" loading="lazy" />
+        <img
+          src={entry.jacket}
+          alt={`${entry.title} jacket`}
+          className="jacket"
+          loading="lazy"
+          onError={useFallbackJacket}
+        />
         {selected ? (
           <span className="selected-mark">
             <Check size={18} />
@@ -91,19 +99,31 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
         <span className="song-stats">{showBpm ? `BPM ${entry.bpm}` : `${entry.category} · ${entry.version}`}</span>
       )}
 
-      {entry.previewAudio ? (
+      {entry.previewAudio && !audioFailed ? (
         <span className="audio-preview" onClick={(event) => event.stopPropagation()}>
           <span>
             <Volume2 size={14} />
             Preview
           </span>
-          <audio controls preload="none" src={entry.previewAudio} />
+          <audio controls preload="none" src={entry.previewAudio} onError={() => setAudioFailed(true)} />
+        </span>
+      ) : entry.previewAudio && audioFailed ? (
+        <span className="audio-preview is-unavailable">
+          <Volume2 size={14} />
+          本地试听未部署
         </span>
       ) : null}
 
       {ytSource && mode !== "compact" ? <YouTubePreview source={ytSource} title={entry.title} /> : null}
     </article>
   );
+}
+
+function useFallbackJacket(event: SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+  if (!image.src.endsWith("/assets/jacket-fallback.svg")) {
+    image.src = "/assets/jacket-fallback.svg";
+  }
 }
 
 function getChartTypeLabel(type: string | undefined, songId: string) {

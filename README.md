@@ -44,15 +44,15 @@ npm run build
 
 构建产物会输出到 `dist/`。这是纯静态文件，可以由 Nginx、Caddy、对象存储或任意静态服务托管。
 
-## 曲库替换方式
+## 曲库与资源
 
-mock 曲库集中在：
+当前正式曲库集中在：
 
 ```text
-src/data/mockSongs.ts
+src/data/importedSongs.json
 ```
 
-后续替换真实 maimai 曲库时，保持 `Song` 字段结构即可：
+`src/data/mockSongs.ts` 只在正式曲库为空时作为开发兜底。替换曲库时保持 `Song` 字段结构：
 
 ```ts
 {
@@ -104,7 +104,12 @@ src/data/youtubeSources.json
 
 ### Admin 管理页
 
-`/admin` 是一个本地编辑器入口，由 Nginx Basic Auth 保护。它不会直接修改线上数据，改动先存在当前浏览器的 `localStorage` 草稿里，点击「导出」后下载 `youtubeSources.json`，再覆盖 `src/data/youtubeSources.json` 并重新构建部署。
+`/admin` 是由 Nginx Basic Auth 保护的静态管理入口，顶部可切换两个工作区：
+
+- `YouTube 音源匹配`：批量导入候选、连续审核、保存草稿并导出 `youtubeSources.json`。
+- `本地资源验收`：逐首检查封面、30 秒试听、等级/定数并导出问题报告。
+
+两个工作区都不会直接修改服务器文件；浏览器只保存 `localStorage` 草稿，最终由管理员导出 JSON、覆盖源码中的对应文件并重新构建部署。
 
 部署前先生成 admin 口令文件。推荐交互式输入密码，避免把密码留在 shell history：
 
@@ -125,7 +130,7 @@ https://你的域名/admin
 
 输入 `admin` 和你设置的密码。没有 `deploy/.htpasswd` 时 Nginx 容器会启动失败；建议只在 HTTPS 域名下使用 `/admin`，否则 Basic Auth 密码会明文传输。
 
-Admin 支持：
+YouTube 音源匹配支持：
 
 - 大曲库工作台：左侧分页歌曲队列，右侧单曲匹配区，默认只显示未匹配歌曲。
 - 按曲名 / 歌手 / song ID 搜索，并筛选全部、已映射或未映射歌曲；支持 25 / 50 / 100 首分页。
@@ -142,6 +147,8 @@ Admin 支持：
 - 导出结果固定为格式化的 `youtubeSources.json`；Admin 不会直接写服务器文件。
 
 顶部「预览下一首」会在当前搜索和筛选范围内顺序检查已映射音源。需要放弃未导出改动时，可用「放弃草稿」恢复到当前构建版本。
+
+本地资源验收工作区可通过 `/admin?workspace=assets` 直达，支持待确认/异常/缺音频/缺定数筛选、三项确认、审核备注，以及导出完整审核记录或异常报告。
 
 ### 一千首以上曲库的快速审核
 
@@ -258,8 +265,21 @@ docker compose up -d --build
 
 ```bash
 cd /home/opc/PluginTest/maimai-music-cup
+npm run release:check
+npm run release:check:assets
 docker compose up -d --build
 ```
+
+`release:check` 校验歌曲 ID、谱面唯一性、原始等级、定数和 YouTube 映射；`release:check:assets` 还会严格检查曲库引用的每张封面和试听文件。
+
+当前 JP 曲库的本地资源目录被刻意排除在 Git 之外：
+
+```text
+public/assets/jackets/jp-db/
+public/assets/previews/jp-db/
+```
+
+因此全新 clone 不能直接视为可上线资源包。必须先在部署机保留/同步已获授权的资源并让 `npm run release:check:assets` 通过，再执行 Docker build；否则页面会使用统一后备封面，试听会显示“本地试听未部署”。
 
 默认访问：
 
@@ -346,6 +366,7 @@ server {
 maimai-music-cup/
   src/
     admin/AdminApp.tsx
+    admin/YouTubeAdmin.tsx
     components/SongCard.tsx
     data/importedSongs.json
     data/youtubeSources.json
@@ -363,7 +384,7 @@ maimai-music-cup/
 
 - 抽签前必须得到至少 48 个唯一参赛项；抽签结果会再次校验 48 个 ID 全部唯一。
 - 歌曲杯参赛 ID 对应 `song.id`。
-- 谱面杯参赛 ID 由 song、difficulty、chart type、constant / level 与谱面序号共同组成，防止同一 `song/chart` 被重复抽入。
+- 谱面杯参赛 ID 由 song、difficulty 与 chart type 组成；同一歌曲的同难度同类型谱面会先做语义去重，再参与抽签。
 - 谱面杯一次只能选择一个 difficulty，因此 Basic、Advanced、Expert、Master 与 Re:Master 不会跨难度配对。
 - 赛事记录保留从 32 强到决赛的 31 场结果；海报左右 bracket 均从 32 强向中央决赛汇聚。
 

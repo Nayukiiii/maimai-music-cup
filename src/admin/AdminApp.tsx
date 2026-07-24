@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { songs } from "../data/songs";
 import type { Chart, Song } from "../types";
+import YouTubeAdmin from "./YouTubeAdmin";
 
 type ReviewValue = "ok" | "issue" | undefined;
 type AssetReview = {
@@ -32,6 +33,7 @@ type RuntimeState = "unknown" | "ok" | "error";
 
 const REVIEW_KEY = "mmc-jp-asset-review-v1";
 const PAGE_SIZE = 80;
+type AdminWorkspace = "youtube" | "assets";
 
 const difficultyOrder: Record<string, number> = {
   Basic: 0,
@@ -58,6 +60,36 @@ function loadReviewMap(): ReviewMap {
 }
 
 export default function AdminApp() {
+  const [workspace, setWorkspace] = useState<AdminWorkspace>(() =>
+    new URLSearchParams(window.location.search).get("workspace") === "assets" ? "assets" : "youtube"
+  );
+
+  function switchWorkspace(next: AdminWorkspace) {
+    setWorkspace(next);
+    const url = new URL(window.location.href);
+    if (next === "assets") url.searchParams.set("workspace", "assets");
+    else url.searchParams.delete("workspace");
+    window.history.replaceState(null, "", url);
+  }
+
+  return (
+    <>
+      <nav className="admin-workspace-switch" aria-label="Admin 工作区">
+        <button className={workspace === "youtube" ? "active" : ""} onClick={() => switchWorkspace("youtube")}>
+          <Music2 size={17} />
+          YouTube 音源匹配
+        </button>
+        <button className={workspace === "assets" ? "active" : ""} onClick={() => switchWorkspace("assets")}>
+          <ShieldCheck size={17} />
+          本地资源验收
+        </button>
+      </nav>
+      {workspace === "youtube" ? <YouTubeAdmin /> : <AssetReviewAdmin />}
+    </>
+  );
+}
+
+function AssetReviewAdmin() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterMode>("pending");
   const [page, setPage] = useState(0);

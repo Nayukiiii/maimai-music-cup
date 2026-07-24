@@ -38,16 +38,22 @@ export function toCupEntries(songs: Song[], filters: CupFilters): CupEntry[] {
     }
 
     const chartCupDifficulty = filters.difficulties[0];
-    return song.charts
+    const matchingCharts = song.charts
       .filter((chart) => !chartCupDifficulty || chart.difficulty === chartCupDifficulty)
       .filter((chart) => {
         if (filters.rangeMode === "constant") {
           return typeof chart.constant === "number" && chart.constant >= filters.minConstant && chart.constant <= filters.maxConstant;
         }
         return isLevelInRange(chart.level, filters.minLevel, filters.maxLevel);
-      })
-      .map((chart, chartIndex) => ({
-        id: `${song.id}::${chart.difficulty}::${chart.type ?? "dx"}::${chart.constant ?? chart.level}::${chartIndex}`,
+      });
+
+    const uniqueCharts = new Map(
+      matchingCharts.map((chart) => [`${chart.difficulty}::${chart.type ?? song.chartType ?? "dx"}`, chart])
+    );
+
+    return [...uniqueCharts.entries()]
+      .map(([chartKey, chart]) => ({
+        id: `${song.id}::${chartKey}`,
         songId: song.id,
         title: song.title,
         artist: song.artist,
