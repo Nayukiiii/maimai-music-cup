@@ -3142,6 +3142,13 @@ button:not(:disabled):hover,
   white-space: nowrap;
 }
 
+.seed-help {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
 .poster-seed {
   display: inline-block;
   margin-top: 8px;

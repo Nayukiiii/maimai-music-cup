@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Camera,
   CheckCircle2,
+  Copy,
   Crown,
   Dices,
   Flag,
@@ -22,6 +23,7 @@ import { CupEntry, CupFilters, Difficulty, MatchRecord, Song } from "./types";
 
 type Phase = "config" | "draw" | "groups" | "revival" | "bracket" | "result";
 type CaptureState = "idle" | "working" | "success" | "error";
+type CopyState = "idle" | "success" | "error";
 
 type BracketSnapshot = {
   roundEntries: CupEntry[];
@@ -31,7 +33,7 @@ type BracketSnapshot = {
 };
 
 const difficulties: Difficulty[] = ["Basic", "Advanced", "Expert", "Master", "Re:Master"];
-const defaultFilters: CupFilters = {
+const fallbackFilters: CupFilters = {
   mode: "song",
   categories: [],
   versions: [],
@@ -43,10 +45,14 @@ const defaultFilters: CupFilters = {
   maxConstant: 15,
   seed: randomSeed()
 };
+const defaultFilters: CupFilters = createDefaultFilters();
+const defaultSeed = defaultFilters.seed;
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>("config");
   const [filters, setFilters] = useState<CupFilters>(defaultFilters);
+  const [seedDraft, setSeedDraft] = useState(defaultSeed);
+  const [seedCopyState, setSeedCopyState] = useState<CopyState>("idle");
   const [groups, setGroups] = useState<CupEntry[][]>([]);
   const [groupIndex, setGroupIndex] = useState(0);
   const [groupSelection, setGroupSelection] = useState<string[]>([]);
@@ -66,11 +72,9 @@ export default function App() {
   const [catalogUsingImported, setCatalogUsingImported] = useState(false);
   const [catalogError, setCatalogError] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
-  const seedInputRef = useRef<HTMLInputElement>(null);
 
-  // 种子输入框是非受控的，开抽时以输入框实际内容为准
   function readSeed() {
-    return seedInputRef.current?.value.trim() || filters.seed;
+    return normalizeSeed(seedDraft) || filters.seed;
   }
 
   useEffect(() => {
@@ -132,7 +136,8 @@ export default function App() {
       ? `${filters.difficulties[0] ?? "Expert"} / ${filters.rangeMode === "level" ? `Lv ${filters.minLevel}–${filters.maxLevel}` : `定数 ${filters.minConstant.toFixed(1)}–${filters.maxConstant.toFixed(1)}`}`
       : "歌曲本体 · 不区分难度";
   const catalogLabel = catalogLoading ? "曲库加载中" : usingImportedSongs ? "JP 曲库" : "Mock 曲库";
-  const cupMeta = `${modeLabel} / ${catalogLabel} / Seed ${filters.seed || "maimai-cup"}`;
+  const activeSeed = phase === "config" ? readSeed() : filters.seed;
+  const cupMeta = `${modeLabel} / ${catalogLabel} / Seed ${activeSeed || "maimai-cup"}`;
   const transitionKey = `${phase}-${roundEntries.length}`;
   const currentGroup = groups[groupIndex] ?? [];
   const currentRoundName = getRoundName(roundEntries.length);
@@ -151,9 +156,10 @@ export default function App() {
       return;
     }
 
-    const seededFilters = { ...filters, seed };
+    const nextSeed = normalizeSeed(seed);
+    const seededFilters = { ...filters, seed: nextSeed };
     const entries = toCupEntries(songs, seededFilters);
-    const nextGroups = makeGroups(entries, seed);
+    const nextGroups = makeGroups(entries, drawSeedFor(seededFilters));
     const drawn = nextGroups.flat();
 
     if (drawn.length !== 48 || new Set(drawn.map((entry) => entry.id)).size !== 48) {
@@ -162,7 +168,9 @@ export default function App() {
     }
 
     setDrawError("");
+    setSeedDraft(nextSeed);
     setFilters(seededFilters);
+    syncCupUrl(seededFilters);
     setGroups(nextGroups);
     setGroupIndex(0);
     setGroupSelection([]);
@@ -234,7 +242,7 @@ export default function App() {
       return;
     }
     const revived = eliminated.filter((entry) => revivalSelection.includes(entry.id));
-    const top32 = shuffleWithSeed([...qualified, ...revived], `${filters.seed}-top32`);
+    const top32 = shuffleWithSeed([...qualified, ...revived], `${drawSeedFor(filters)}-top32`);
     setRoundEntries(top32);
     setRoundWinners([]);
     setMatchIndex(0);
@@ -335,6 +343,21 @@ export default function App() {
     setUndoStack([]);
     setDrawError("");
     setCaptureState("idle");
+  }
+
+  async function copySeedLink() {
+    const nextFilters = { ...filters, seed: readSeed() };
+    const url = buildCupUrl(nextFilters);
+    setFilters(nextFilters);
+    setSeedDraft(nextFilters.seed);
+    syncCupUrl(nextFilters);
+    try {
+      await copyText(url);
+      setSeedCopyState("success");
+    } catch {
+      setSeedCopyState("error");
+    }
+    window.setTimeout(() => setSeedCopyState("idle"), 1800);
   }
 
   return (
@@ -543,8 +566,9 @@ export default function App() {
                     id="cup-seed"
                     name="cup-seed"
                     type="text"
-                    ref={seedInputRef}
-                    defaultValue={filters.seed}
+                    value={seedDraft}
+                    onChange={(event) => setSeedDraft(event.target.value)}
+                    onBlur={() => setSeedDraft(readSeed())}
                     autoComplete="off"
                     autoCapitalize="off"
                     autoCorrect="off"
@@ -556,16 +580,22 @@ export default function App() {
                     className="ghost-action"
                     onClick={() => {
                       const next = randomSeed();
-                      if (seedInputRef.current) {
-                        seedInputRef.current.value = next;
-                      }
+                      setSeedDraft(next);
                       setFilters((current) => ({ ...current, seed: next }));
                     }}
                   >
                     <Dices size={16} />
                     随机
                   </button>
+                  <button type="button" className="ghost-action" onClick={copySeedLink}>
+                    <Copy size={16} />
+                    {seedCopyState === "success" ? "已复制" : "复制链接"}
+                  </button>
                 </div>
+                <p className="seed-help">
+                  同组复现要同时匹配模式、筛选和曲库；复制链接会把这些全部带上，只靠口头报种子容易跑偏。
+                </p>
+                {seedCopyState === "error" ? <p className="form-error">复制失败，请手动复制地址栏链接。</p> : null}
               </div>
             </details>
 
@@ -1060,6 +1090,116 @@ function isEntry(entry: CupEntry | undefined): entry is CupEntry {
 
 function isNumber(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function createDefaultFilters(): CupFilters {
+  if (typeof window === "undefined") {
+    return fallbackFilters;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const mode: CupFilters["mode"] = params.get("mode") === "chart" ? "chart" : "song";
+  const difficulty = parseDifficulty(params.get("difficulty"));
+  const rangeMode: CupFilters["rangeMode"] = params.get("range") === "constant" ? "constant" : "level";
+
+  return {
+    ...fallbackFilters,
+    mode,
+    categories: params.getAll("category").map(normalizeLooseValue).filter(Boolean),
+    versions: params.getAll("version").map(normalizeLooseValue).filter(Boolean),
+    difficulties: mode === "chart" ? [difficulty] : fallbackFilters.difficulties,
+    rangeMode,
+    minLevel: normalizeLevelParam(params.get("minLevel"), fallbackFilters.minLevel),
+    maxLevel: normalizeLevelParam(params.get("maxLevel"), fallbackFilters.maxLevel),
+    minConstant: normalizeNumberParam(params.get("minConstant"), fallbackFilters.minConstant),
+    maxConstant: normalizeNumberParam(params.get("maxConstant"), fallbackFilters.maxConstant),
+    seed: normalizeSeed(params.get("seed") || fallbackFilters.seed)
+  };
+}
+
+function buildCupUrl(filters: CupFilters) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("mode", filters.mode);
+  url.searchParams.set("seed", normalizeSeed(filters.seed));
+  filters.categories.forEach((category) => url.searchParams.append("category", category));
+  filters.versions.forEach((version) => url.searchParams.append("version", version));
+
+  if (filters.mode === "chart") {
+    url.searchParams.set("difficulty", filters.difficulties[0] || "Expert");
+    url.searchParams.set("range", filters.rangeMode);
+    if (filters.rangeMode === "constant") {
+      url.searchParams.set("minConstant", String(filters.minConstant));
+      url.searchParams.set("maxConstant", String(filters.maxConstant));
+    } else {
+      url.searchParams.set("minLevel", filters.minLevel);
+      url.searchParams.set("maxLevel", filters.maxLevel);
+    }
+  }
+
+  return url.toString();
+}
+
+function syncCupUrl(filters: CupFilters) {
+  if (typeof window === "undefined") return;
+  window.history.replaceState(null, "", buildCupUrl(filters));
+}
+
+function drawSeedFor(filters: CupFilters) {
+  return JSON.stringify({
+    seed: normalizeSeed(filters.seed),
+    mode: filters.mode,
+    categories: [...filters.categories].sort(),
+    versions: [...filters.versions].sort(),
+    difficulty: filters.mode === "chart" ? filters.difficulties[0] : "song",
+    rangeMode: filters.mode === "chart" ? filters.rangeMode : "song",
+    minLevel: filters.mode === "chart" && filters.rangeMode === "level" ? filters.minLevel : "",
+    maxLevel: filters.mode === "chart" && filters.rangeMode === "level" ? filters.maxLevel : "",
+    minConstant: filters.mode === "chart" && filters.rangeMode === "constant" ? filters.minConstant : "",
+    maxConstant: filters.mode === "chart" && filters.rangeMode === "constant" ? filters.maxConstant : ""
+  });
+}
+
+function normalizeSeed(value: string) {
+  return normalizeLooseValue(value).replace(/\s+/g, "-").toUpperCase().slice(0, 48) || randomSeed();
+}
+
+function normalizeLooseValue(value: string | null) {
+  return String(value ?? "").normalize("NFKC").trim();
+}
+
+function normalizeLevelParam(value: string | null, fallback: string) {
+  const normalized = normalizeLooseValue(value);
+  return /^\d{1,2}\+?$/.test(normalized) ? normalized : fallback;
+}
+
+function normalizeNumberParam(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 20 ? parsed : fallback;
+}
+
+function parseDifficulty(value: string | null): Difficulty {
+  const normalized = normalizeLooseValue(value) as Difficulty;
+  return difficulties.includes(normalized) ? normalized : "Expert";
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  if (!copied) throw new Error("copy failed");
 }
 
 function randomSeed() {

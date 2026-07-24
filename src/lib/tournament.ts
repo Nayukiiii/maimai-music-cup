@@ -88,8 +88,8 @@ function levelRank(level: string) {
 export function shuffleWithSeed<T>(items: T[], seed: string): T[] {
   const rand = mulberry32(hashSeed(seed || "maimai-cup"));
   return [...items]
-    .map((item) => ({ item, score: rand() }))
-    .sort((a, b) => a.score - b.score)
+    .map((item, index) => ({ item, index, score: rand() }))
+    .sort((a, b) => a.score - b.score || a.index - b.index)
     .map(({ item }) => item);
 }
 
