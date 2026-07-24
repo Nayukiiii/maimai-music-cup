@@ -7,6 +7,10 @@ services:
       - "${APP_PORT:-18080}:80"
     volumes:
       - ./deploy/.htpasswd:/etc/nginx/.htpasswd:ro
+      # 曲绘与试听不打进镜像（见 .dockerignore），改为运行时挂载。
+      # 只挂两个子目录，避免覆盖 /assets 下 Vite 产出的 js/css。
+      - ./deploy/private-assets/assets/jackets/jp-db:/usr/share/nginx/html/assets/jackets/jp-db:ro
+      - ./deploy/private-assets/assets/previews/jp-db:/usr/share/nginx/html/assets/previews/jp-db:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -q '^ok$'"]
       interval: 30s
