@@ -670,6 +670,7 @@ export default function App() {
             <div className="rule-code-strip">
               <span>规则码</span>
               <b>{ruleCode}</b>
+              <small>规则码用于核对同一届：朋友双方看到的规则码和 Seed 都一样，抽签才会完全一致。</small>
             </div>
 
             <FilterBlock title="赛事预设" className="preset-filter">
@@ -818,9 +819,9 @@ export default function App() {
             ) : null}
 
             <details className="advanced-block">
-              <summary>高级 · 随机种子</summary>
+              <summary>高级 · 种子与分享</summary>
               <div className="seed-field">
-                <label htmlFor="cup-seed">默认已随机；填入相同种子可复现同一届抽签</label>
+                <label htmlFor="cup-seed">Seed 是抽签随机源；规则码是当前模式和筛选的校验码</label>
                 <div className="seed-row">
                   <input
                     id="cup-seed"
@@ -849,15 +850,15 @@ export default function App() {
                   </button>
                   <button type="button" className="ghost-action" onClick={copySeedLink}>
                     <Copy size={16} />
-                    {seedCopyState === "success" ? "已复制" : "复制链接"}
+                    {seedCopyState === "success" ? "已复制" : "复制配置"}
                   </button>
                   <button type="button" className="ghost-action" onClick={copyAutoDrawLink}>
                     <Link size={16} />
-                    {autoLinkCopyState === "success" ? "已复制" : "自动抽签"}
+                    {autoLinkCopyState === "success" ? "已复制" : "复制抽签链接"}
                   </button>
                 </div>
                 <p className="seed-help">
-                  同组复现要同时匹配模式、筛选和曲库；复制链接会把这些全部带上，只靠口头报种子容易跑偏。
+                  复制配置：朋友打开后看到同一套配置，需要自己点开始抽签。复制抽签链接：朋友打开后会自动进入同一份小组抽签结果。只口头报 Seed 不够，还要核对规则码。
                 </p>
                 {seedCopyState === "error" || autoLinkCopyState === "error" ? <p className="form-error">复制失败，请手动复制地址栏链接。</p> : null}
               </div>
@@ -871,19 +872,19 @@ export default function App() {
           </div>
 
           <div className="preview-grid">
+            <LibraryPrefs favoriteCount={favoriteSongIds.length} excludedCount={excludedSongIds.length} onClearExcluded={() => setExcludedSongIds([])} />
             {pool.slice(0, 6).map((entry, index) => (
               <div className="stagger-item" style={{ ["--stagger" as string]: `${index * 55}ms` }} key={entry.id}>
                 <SongCard entry={entry} mode="compact" />
-                <EntryToggles
-                  entry={entry}
-                  favorite={favoriteSongIds.includes(entry.songId)}
-                  excluded={excludedSongIds.includes(entry.songId)}
-                  onFavorite={toggleFavorite}
-                  onExclude={toggleExcluded}
-                />
               </div>
             ))}
-            <LibraryPrefs favoriteCount={favoriteSongIds.length} excludedCount={excludedSongIds.length} onClearExcluded={() => setExcludedSongIds([])} />
+            <PreviewEntryManager
+              entries={pool.slice(0, 6)}
+              favoriteSongIds={favoriteSongIds}
+              excludedSongIds={excludedSongIds}
+              onFavorite={toggleFavorite}
+              onExclude={toggleExcluded}
+            />
             <div className="config-archives">
               <ArchiveStrip archives={archives} />
             </div>
@@ -1386,10 +1387,46 @@ function EntryToggles({
 function LibraryPrefs({ favoriteCount, excludedCount, onClearExcluded }: { favoriteCount: number; excludedCount: number; onClearExcluded: () => void }) {
   return (
     <div className="library-prefs">
-      <span><Heart size={14} /> 收藏 {favoriteCount}</span>
-      <span>排除 {excludedCount}</span>
+      <span><Heart size={14} /> 本地收藏 {favoriteCount}</span>
+      <span>本地排除 {excludedCount}</span>
       {excludedCount ? <button type="button" onClick={onClearExcluded}>清空排除</button> : null}
     </div>
+  );
+}
+
+function PreviewEntryManager({
+  entries,
+  favoriteSongIds,
+  excludedSongIds,
+  onFavorite,
+  onExclude
+}: {
+  entries: CupEntry[];
+  favoriteSongIds: string[];
+  excludedSongIds: string[];
+  onFavorite: (entry: CupEntry) => void;
+  onExclude: (entry: CupEntry) => void;
+}) {
+  if (!entries.length) return null;
+  return (
+    <details className="preview-manager">
+      <summary>管理当前预览曲目</summary>
+      <div className="preview-manager-list">
+        {entries.map((entry) => (
+          <div className="preview-manager-row" key={entry.id}>
+            <img src={entry.jacket} alt="" onError={useFallbackJacket} />
+            <span>{entry.title}</span>
+            <EntryToggles
+              entry={entry}
+              favorite={favoriteSongIds.includes(entry.songId)}
+              excluded={excludedSongIds.includes(entry.songId)}
+              onFavorite={onFavorite}
+              onExclude={onExclude}
+            />
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

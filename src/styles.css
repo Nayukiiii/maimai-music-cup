@@ -3116,29 +3116,24 @@ button:not(:disabled):hover,
 }
 
 .seed-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 8px;
-  align-items: center;
-}
-
-.seed-row {
-  flex-wrap: wrap;
+  align-items: stretch;
 }
 
 /* 输入框必须能伸展且允许收缩到 0，否则在 390px 手机上会被
    nowrap 的「随机」按钮挤成 22px 的一条缝：能聚焦、能弹键盘，
    但实际没法输入。min-width:0 是关键，flex item 默认 min-width:auto。 */
 .app-shell .seed-row input {
-  flex: 1 1 180px;
   min-width: 0;
-  width: auto;
+  width: 100%;
   margin-top: 0;
   /* 16px 以下 iOS 聚焦时会自动放大页面 */
   font-size: 16px;
 }
 
 .seed-row button {
-  flex: 0 0 auto;
   white-space: nowrap;
 }
 
@@ -3159,10 +3154,10 @@ button:not(:disabled):hover,
 }
 
 .rule-code-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr;
   gap: 12px;
+  align-items: center;
   margin: 12px 0 16px;
   border: 1px solid rgba(255, 212, 121, 0.28);
   border-radius: 8px;
@@ -3183,6 +3178,14 @@ button:not(:disabled):hover,
   color: var(--gold);
   font-size: 0.95rem;
   letter-spacing: 0.08em;
+}
+
+.rule-code-strip small {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.55;
 }
 
 .preset-filter .chip-row {
@@ -3273,6 +3276,65 @@ button:not(:disabled):hover,
 
 .config-archives {
   grid-column: 1 / -1;
+}
+
+.preview-manager {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.preview-manager summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+  list-style: none;
+}
+
+.preview-manager summary::-webkit-details-marker {
+  display: none;
+}
+
+.preview-manager summary::before {
+  content: "▸ ";
+  color: var(--sakura);
+}
+
+.preview-manager[open] summary::before {
+  content: "▾ ";
+}
+
+.preview-manager-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.preview-manager-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.preview-manager-row img {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.preview-manager-row > span {
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .library-prefs span {
@@ -3446,10 +3508,19 @@ button:not(:disabled):hover,
 }
 
 @media (max-width: 760px) {
+  .seed-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .seed-row input {
+    grid-column: 1 / -1;
+  }
+
   .preset-filter .chip-row,
   .revival-lineup,
   .stats-grid,
-  .archive-row {
+  .archive-row,
+  .preview-manager-row {
     grid-template-columns: 1fr;
   }
 
