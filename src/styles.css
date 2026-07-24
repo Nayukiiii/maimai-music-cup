@@ -3203,7 +3203,8 @@ button:not(:disabled):hover,
 }
 
 .preset-chip b,
-.preset-chip span {
+.preset-chip span,
+.preset-chip small {
   display: block;
 }
 
@@ -3217,6 +3218,22 @@ button:not(:disabled):hover,
   color: var(--text-muted);
   font-size: 0.74rem;
   line-height: 1.45;
+}
+
+.preset-chip small {
+  margin-top: 7px;
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.preset-chip:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.preset-chip:disabled small {
+  color: var(--red);
 }
 
 .entry-toggles,

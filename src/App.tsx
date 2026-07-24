@@ -77,40 +77,64 @@ const posterThemes: { id: PosterTheme; label: string }[] = [
 ];
 const rulePresets: RulePreset[] = [
   {
-    id: "song-pop",
-    title: "本命歌曲杯",
-    desc: "默认歌曲杯，只按分类和版本抽歌。",
+    id: "song-all",
+    title: "全曲本命杯",
+    desc: "歌曲杯全池，最适合第一次开赛。",
     filters: { mode: "song", categories: [], versions: [] }
   },
   {
-    id: "chart-exp-13",
-    title: "红谱 13 段位",
-    desc: "Expert / Lv 13-13+，适合快速开打。",
-    filters: { mode: "chart", difficulties: ["Expert"], rangeMode: "level", minLevel: "13", maxLevel: "13+" }
+    id: "song-original",
+    title: "maimai 原创杯",
+    desc: "只抽 maimai 分类歌曲。",
+    filters: { mode: "song", categories: ["maimai"], versions: [] }
+  },
+  {
+    id: "song-vocaloid",
+    title: "nico/V 家杯",
+    desc: "niconico ボーカロイド歌曲池。",
+    filters: { mode: "song", categories: ["niconicoボーカロイド"], versions: [] }
+  },
+  {
+    id: "song-toho",
+    title: "东方 Project 杯",
+    desc: "东方分类歌曲池。",
+    filters: { mode: "song", categories: ["東方Project"], versions: [] }
+  },
+  {
+    id: "chart-exp-12",
+    title: "红谱主战场",
+    desc: "Expert / Lv 12-13+，红谱数量更稳。",
+    filters: { mode: "chart", categories: [], versions: [], difficulties: ["Expert"], rangeMode: "level", minLevel: "12", maxLevel: "13+" }
+  },
+  {
+    id: "chart-master-13",
+    title: "紫谱本命战",
+    desc: "Master / Lv 13-13+，数量多且对味。",
+    filters: { mode: "chart", categories: [], versions: [], difficulties: ["Master"], rangeMode: "level", minLevel: "13", maxLevel: "13+" }
   },
   {
     id: "chart-master-14",
     title: "紫谱神仙杯",
-    desc: "Master / Lv 14-14+，强度直接拉满。",
-    filters: { mode: "chart", difficulties: ["Master"], rangeMode: "level", minLevel: "14", maxLevel: "14+" }
+    desc: "Master / Lv 14-14+，高难淘汰赛。",
+    filters: { mode: "chart", categories: [], versions: [], difficulties: ["Master"], rangeMode: "level", minLevel: "14", maxLevel: "14+" }
   },
   {
     id: "chart-remaster",
-    title: "白谱特别赛",
-    desc: "Re:Master 全池，只抽白谱。",
-    filters: { mode: "chart", difficulties: ["Re:Master"], rangeMode: "level", minLevel: "1", maxLevel: "15" }
+    title: "白谱精英杯",
+    desc: "Re:Master / Lv 13-14+，不叠版本筛选。",
+    filters: { mode: "chart", categories: [], versions: [], difficulties: ["Re:Master"], rangeMode: "level", minLevel: "13", maxLevel: "14+" }
   },
   {
     id: "new-era",
-    title: "新曲版本杯",
-    desc: "PRiSM / CiRCLE 系列优先。",
-    filters: { mode: "song", versions: ["PRiSM", "PRiSM PLUS", "CiRCLE", "CiRCLE PLUS"] }
+    title: "近代新曲杯",
+    desc: "BUDDiES / PRiSM / CiRCLE 系列。",
+    filters: { mode: "song", categories: [], versions: ["BUDDiES", "BUDDiES PLUS", "PRiSM", "PRiSM PLUS", "CiRCLE", "CiRCLE PLUS"] }
   },
   {
     id: "classic",
     title: "怀旧街机杯",
-    desc: "maimai 到 PiNK 时代。",
-    filters: { mode: "song", versions: ["maimai", "maimai PLUS", "GreeN", "GreeN PLUS", "ORANGE", "ORANGE PLUS", "PiNK"] }
+    desc: "maimai 初代到 FiNALE。",
+    filters: { mode: "song", categories: [], versions: ["maimai", "maimai PLUS", "GreeN", "GreeN PLUS", "ORANGE", "ORANGE PLUS", "PiNK", "PiNK PLUS", "MURASAKi", "MURASAKi PLUS", "MiLK", "MiLK PLUS", "FiNALE"] }
   }
 ];
 const fallbackFilters: CupFilters = {
@@ -254,6 +278,19 @@ export default function App() {
     () => buildTournamentStats([...groups.flat(), ...qualified, ...revivalPicks], history, champion),
     [groups, qualified, revivalPicks, history, champion]
   );
+  const presetOptions = useMemo(
+    () =>
+      rulePresets.map((preset) => {
+        const presetFilters = buildPresetFilters(preset, readSeed(), categories, versions);
+        const entries = toCupEntries(songs, presetFilters).filter((entry) => !excludedSongIds.includes(entry.songId));
+        return {
+          preset,
+          count: new Set(entries.map((entry) => entry.songId)).size,
+          filters: presetFilters
+        };
+      }),
+    [songs, categories, versions, excludedSongIds, seedDraft]
+  );
 
   useEffect(() => {
     saveLocalArray("mmc-favorite-song-ids", favoriteSongIds);
@@ -356,14 +393,7 @@ export default function App() {
   }
 
   function applyPreset(preset: RulePreset) {
-    const nextFilters: CupFilters = {
-      ...filters,
-      ...preset.filters,
-      categories: preset.filters.categories?.filter((category) => categories.includes(category)) ?? filters.categories,
-      versions: preset.filters.versions?.filter((version) => versions.includes(version)) ?? filters.versions,
-      difficulties: preset.filters.difficulties ?? filters.difficulties,
-      seed: randomSeed()
-    };
+    const nextFilters = buildPresetFilters(preset, randomSeed(), categories, versions);
     setFilters(nextFilters);
     setSeedDraft(nextFilters.seed);
     syncCupUrl(nextFilters);
@@ -674,10 +704,17 @@ export default function App() {
             </div>
 
             <FilterBlock title="赛事预设" className="preset-filter">
-              {rulePresets.map((preset) => (
-                <button type="button" className="preset-chip" key={preset.id} onClick={() => applyPreset(preset)}>
+              {presetOptions.map(({ preset, count }) => (
+                <button
+                  type="button"
+                  className="preset-chip"
+                  key={preset.id}
+                  onClick={() => applyPreset(preset)}
+                  disabled={catalogLoading || count < 48}
+                >
                   <b>{preset.title}</b>
                   <span>{preset.desc}</span>
+                  <small>{catalogLoading ? "统计中" : count >= 48 ? `当前可参赛 ${count}` : `仅 ${count}，不足 48`}</small>
                 </button>
               ))}
             </FilterBlock>
@@ -1579,6 +1616,26 @@ function buildTournamentStats(entries: CupEntry[], history: MatchRecord[], champ
       ? championPath.map((record) => `${record.round}胜 ${record.loser.title}`).join(" / ")
       : "暂无"
   };
+}
+
+function buildPresetFilters(preset: RulePreset, seed: string, availableCategories: string[], availableVersions: string[]): CupFilters {
+  const mode = preset.filters.mode ?? fallbackFilters.mode;
+  const nextFilters: CupFilters = {
+    ...fallbackFilters,
+    ...preset.filters,
+    mode,
+    seed: normalizeSeed(seed),
+    categories: (preset.filters.categories ?? []).filter((category) => availableCategories.includes(category)),
+    versions: (preset.filters.versions ?? []).filter((version) => availableVersions.includes(version)),
+    difficulties: mode === "chart" ? [preset.filters.difficulties?.[0] ?? "Expert"] : fallbackFilters.difficulties,
+    rangeMode: preset.filters.rangeMode ?? "level",
+    minLevel: preset.filters.minLevel ?? fallbackFilters.minLevel,
+    maxLevel: preset.filters.maxLevel ?? fallbackFilters.maxLevel,
+    minConstant: preset.filters.minConstant ?? fallbackFilters.minConstant,
+    maxConstant: preset.filters.maxConstant ?? fallbackFilters.maxConstant
+  };
+
+  return normalizeLevelRange(nextFilters);
 }
 
 function topCountLabel(values: string[]) {
