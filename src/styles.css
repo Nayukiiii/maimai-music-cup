@@ -3121,8 +3121,20 @@ button:not(:disabled):hover,
   align-items: center;
 }
 
-.seed-row input {
+.seed-row {
+  flex-wrap: wrap;
+}
+
+/* 输入框必须能伸展且允许收缩到 0，否则在 390px 手机上会被
+   nowrap 的「随机」按钮挤成 22px 的一条缝：能聚焦、能弹键盘，
+   但实际没法输入。min-width:0 是关键，flex item 默认 min-width:auto。 */
+.app-shell .seed-row input {
+  flex: 1 1 180px;
+  min-width: 0;
+  width: auto;
   margin-top: 0;
+  /* 16px 以下 iOS 聚焦时会自动放大页面 */
+  font-size: 16px;
 }
 
 .seed-row button {
