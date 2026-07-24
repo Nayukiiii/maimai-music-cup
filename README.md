@@ -130,6 +130,8 @@ https://你的域名/admin
 
 输入 `admin` 和你设置的密码。没有 `deploy/.htpasswd` 时 Nginx 容器会启动失败；建议只在 HTTPS 域名下使用 `/admin`，否则 Basic Auth 密码会明文传输。
 
+`npm run dev` 使用 Vite，不经过 Nginx，因此本地开发时 `/admin` 不会触发 Basic Auth。不要把 Vite 开发端口直接暴露到公网；正式环境必须经过 Nginx 容器或等价的反向代理保护。
+
 YouTube 音源匹配支持：
 
 - 大曲库工作台：左侧分页歌曲队列，右侧单曲匹配区，默认只显示未匹配歌曲。
@@ -139,6 +141,9 @@ YouTube 音源匹配支持：
 - 可编辑搜索关键词，并一键切换“曲名 + 歌手”“maimai 音源”“官方 / Topic”三种搜索模板。
 - 填写 YouTube Data API Key 时一次取得最多 8 条结果，按曲名、歌手、官方音源特征排序后展示前 6 个候选；不填写时使用当前关键词打开 YouTube 搜索页。
 - 候选可逐条试听、选用或“确认并下一首”；不会静默采用第一条结果，并会提示同一视频是否已被其他歌曲使用。
+- 候选队列拆成「严格推荐」和「需人工核对」；严格推荐同时检查曲名命中、分数、第一/第二名分差、负面关键词和视频 ID 去重。
+- 支持批量采用严格推荐，并自动保存一次操作前快照；发现问题时可以立即撤销整批。
+- 候选页无需先点击第一条：`Space` 试听当前推荐/已选项，`Enter` 确认并进入下一首，`1–6` 切换候选，`S` 暂时跳过。
 - 在“仅未匹配”队列中保存后仍停留在当前歌曲供试听核对，只有点击“保存并下一首”才会继续推进。
 - API Key 只放在当前浏览器标签页的 `sessionStorage`，不会写入源码、JSON 或构建产物。
 - 自动保存 `localStorage` 草稿，并显示待导出变更数。
@@ -146,7 +151,7 @@ YouTube 音源匹配支持：
 - 导入、匹配、保存、试听与导出均有 loading / success / error 状态。
 - 导出结果固定为格式化的 `youtubeSources.json`；Admin 不会直接写服务器文件。
 
-顶部「预览下一首」会在当前搜索和筛选范围内顺序检查已映射音源。需要放弃未导出改动时，可用「放弃草稿」恢复到当前构建版本。
+顶部「下一首未匹配 / 下一首候选」会在当前搜索范围内继续推进。需要放弃未导出改动时，可用「放弃草稿」恢复到当前构建版本。
 
 本地资源验收工作区可通过 `/admin?workspace=assets` 直达，支持待确认/异常/缺音频/缺定数筛选、三项确认、审核备注，以及导出完整审核记录或异常报告。
 
@@ -172,6 +177,7 @@ npm run candidates:generate
 
 - 只扫描 `youtubeSources.json` 中尚未映射的歌曲。
 - 每首歌生成 5 个候选，默认请求间隔 900ms。
+- 默认使用 2 个并发 worker；每个 worker 独立遵守请求间隔。
 - 结果保存为被 `.gitignore` 排除的 `youtubeCandidates.json`。
 - 每处理一首就写入检查点；按 `Ctrl+C` 中断后重新运行同一命令会自动跳过已完成歌曲。
 - 搜索失败的歌曲保留在错误记录中，下次运行会自动重试。
@@ -183,16 +189,24 @@ npm run candidates:generate -- --limit 200 --offset 0
 npm run candidates:generate -- --limit 200 --offset 200
 ```
 
+网络稳定时可适当提高并发，最高限制为 6；出现限流时应降低并发或增大 `--delay`：
+
+```bash
+npm run candidates:generate -- --concurrency 3 --delay 1200
+```
+
 生成完成后进入 `/admin`：
 
 1. 点击「导入候选包」，选择 `youtubeCandidates.json`。
-2. 状态切到「候选待审核」。
-3. 默认按最高候选匹配度排序，先快速清理高置信歌曲；也可以切换为“需核对优先”或曲库顺序。
-4. 使用数字键 `1–6` 选择候选，`Space` 试听，`Enter` 确认并进入下一首，`S` 暂时跳过。
+2. 先点击「批量采用严格推荐」，必要时可用旁边的撤销按钮恢复。
+3. 进入「需人工核对」，默认按匹配度排序，也可以切换为“需核对优先”或曲库顺序。
+4. 对推荐项按 `Space` 试听、`Enter` 确认并下一首；需要换候选时按 `1–6`，无法判断时按 `S`。
 5. 集中处理「无候选」和「已跳过」队列。
 6. 最后导出 `youtubeSources.json` 并重新构建部署。
 
 候选包与跳过进度保存在当前浏览器的 `localStorage` 中，不会上传到服务器，也不会写进前端构建产物。
+
+浏览器缓存候选时会省略可由视频 ID 重建的缩略图 URL，降低千首曲库触发容量上限的概率；仍建议生成和导入 200–300 首一批。
 
 导出后生效流程：
 
@@ -266,20 +280,42 @@ docker compose up -d --build
 ```bash
 cd /home/opc/PluginTest/maimai-music-cup
 npm run release:check
-npm run release:check:assets
 docker compose up -d --build
 ```
 
-`release:check` 校验歌曲 ID、谱面唯一性、原始等级、定数和 YouTube 映射；`release:check:assets` 还会严格检查曲库引用的每张封面和试听文件。
+`release:check` 校验歌曲 ID、谱面唯一性、原始等级、定数和 YouTube 映射。JP 封面与试听属于可选的部署机私有资源，不是代码发布条件；没有这些文件时页面会使用后备封面，并在试听不可用时给出降级提示。
 
-当前 JP 曲库的本地资源目录被刻意排除在 Git 之外：
+JP 封面与试听有版权风险，以下目录同时被 `.gitignore` 和 `.dockerignore` 排除，不能提交到 GitHub，也不会被复制进可推送的 Docker 镜像：
 
 ```text
 public/assets/jackets/jp-db/
 public/assets/previews/jp-db/
+deploy/private-assets/
 ```
 
-因此全新 clone 不能直接视为可上线资源包。必须先在部署机保留/同步已获授权的资源并让 `npm run release:check:assets` 通过，再执行 Docker build；否则页面会使用统一后备封面，试听会显示“本地试听未部署”。
+如果你在部署机上拥有合法可用、但不能进入远程仓库的资源，可以放在：
+
+```text
+deploy/private-assets/assets/jackets/jp-db/
+deploy/private-assets/assets/previews/jp-db/
+```
+
+然后使用只读运行时挂载启动：
+
+```bash
+mkdir -p deploy/private-assets/assets/jackets/jp-db
+mkdir -p deploy/private-assets/assets/previews/jp-db
+npm run release:check:assets
+docker compose -f docker-compose.yml -f docker-compose.private-assets.yml up -d --build
+```
+
+`release:check:assets` 默认会同时检查 `public/` 和 `deploy/private-assets/`。资源放在其他服务器目录时，可以临时指定根目录：
+
+```bash
+MMC_PRIVATE_ASSET_ROOT=/srv/maimai-private-assets npm run release:check:assets
+```
+
+这种方式只把文件挂载到正在运行的 Nginx 容器，资源不进入 Git 历史、Docker build context 或镜像层。若没有合法资源，直接使用基础 `docker compose up -d --build` 即可。
 
 默认访问：
 
@@ -322,11 +358,16 @@ cd maimai-music-cup
 
 如果不是 Git 仓库，也可以用 `scp` 或 OCI Cloud Shell 上传整个 `maimai-music-cup` 文件夹。
 
-3. 启动容器
+3. 生成 Admin 口令并启动容器
 
 ```bash
+mkdir -p deploy
+docker run --rm -it -v "$PWD/deploy:/work" httpd:2.4-alpine \
+  htpasswd -cB /work/.htpasswd admin
+chmod 644 deploy/.htpasswd
 docker compose up -d --build
 docker compose ps
+curl -fsS http://127.0.0.1:18080/healthz
 ```
 
 4. OCI 安全列表 / NSG
@@ -373,11 +414,15 @@ maimai-music-cup/
     data/mockSongs.ts
     lib/tournament.ts
     App.tsx
+    tournament-polish.css
+    admin-polish.css
     main.tsx
     styles.css
+  scripts/generate-youtube-candidates.mjs
   Dockerfile
   nginx.conf
   docker-compose.yml
+  docker-compose.private-assets.yml
 ```
 
 ## 赛事规则与数据约束

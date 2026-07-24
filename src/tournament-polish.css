@@ -1,0 +1,797 @@
+/* Final public tournament layer. Loaded after the legacy theme so desktop and
+   mobile share one predictable density contract. */
+
+:root {
+  --arena-bg: #070a16;
+  --arena-surface: rgba(16, 21, 42, 0.94);
+  --arena-line: rgba(109, 233, 240, 0.16);
+  --arena-line-strong: rgba(109, 233, 240, 0.36);
+  --arena-text: #f4f8ff;
+  --arena-muted: #9dabbe;
+  --arena-cyan: #6de9f0;
+  --arena-pink: #ff75b9;
+  --arena-gold: #ffe17d;
+  --arena-shadow: 0 22px 70px rgba(0, 0, 0, 0.34);
+}
+
+html {
+  background: var(--arena-bg);
+}
+
+body {
+  color: var(--arena-text);
+  background:
+    radial-gradient(900px 520px at 8% -12%, rgba(54, 220, 232, 0.16), transparent 66%),
+    radial-gradient(820px 560px at 104% 8%, rgba(255, 91, 166, 0.15), transparent 62%),
+    linear-gradient(rgba(109, 233, 240, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 233, 240, 0.025) 1px, transparent 1px),
+    var(--arena-bg);
+  background-size: auto, auto, 40px 40px, 40px 40px, auto;
+}
+
+.app-shell {
+  width: min(1180px, 100%);
+  padding: 18px 20px 42px;
+}
+
+.app-shell .phase-stage,
+.app-shell .phase-panel,
+.app-shell .stage,
+.app-shell .control-surface,
+.app-shell .song-card,
+.app-shell .song-meta,
+.app-shell .tag-row,
+.app-shell .chart-panel {
+  min-width: 0;
+}
+
+.app-shell .topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--arena-line);
+  padding: 4px 2px 16px;
+}
+
+.app-shell .eyebrow {
+  margin-bottom: 5px;
+  color: var(--arena-cyan);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+}
+
+.app-shell h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 3vw, 2.8rem);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+.app-shell .cup-context {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.app-shell .cup-context span,
+.app-shell .stage-meta {
+  min-height: 24px;
+  border-color: rgba(109, 233, 240, 0.22);
+  padding: 4px 8px;
+  color: #bffaff;
+  background: rgba(109, 233, 240, 0.065);
+  font-size: 0.67rem;
+}
+
+.app-shell .phase-badge {
+  min-width: 90px;
+  min-height: 40px;
+  border-color: rgba(255, 225, 125, 0.38);
+  padding: 8px 12px;
+  color: var(--arena-gold);
+  background: rgba(255, 225, 125, 0.07);
+  font-size: 0.78rem;
+}
+
+.app-shell .cup-stepper {
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.app-shell .cup-stepper > div {
+  min-height: 38px;
+  border-radius: 9px;
+  padding: 7px 9px;
+  font-size: 0.7rem;
+}
+
+.app-shell .cup-stepper span {
+  width: 20px;
+  height: 20px;
+  font-size: 0.66rem;
+}
+
+.app-shell .cup-stepper .current {
+  border-color: rgba(109, 233, 240, 0.46);
+  background: linear-gradient(120deg, rgba(109, 233, 240, 0.14), rgba(255, 117, 185, 0.07));
+}
+
+.app-shell .control-surface,
+.app-shell .stage,
+.app-shell .result-panel {
+  width: 100%;
+  border: 1px solid var(--arena-line);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(25, 31, 59, 0.96), rgba(9, 12, 27, 0.97));
+  box-shadow: var(--arena-shadow);
+}
+
+.app-shell .config-layout {
+  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.app-shell .control-surface {
+  top: 12px;
+  overflow: hidden;
+  padding: 18px;
+}
+
+.app-shell .section-title {
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.96rem;
+}
+
+.app-shell .mode-toggle {
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 4px;
+}
+
+.app-shell .mode-toggle button {
+  min-height: 40px;
+  font-size: 0.82rem;
+}
+
+.app-shell .filter-hint {
+  margin: 0 0 10px;
+  border-left-width: 2px;
+  border-radius: 0 8px 8px 0;
+  padding: 7px 9px;
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.app-shell .filter-block {
+  margin: 13px 0;
+}
+
+.app-shell .filter-title {
+  margin-bottom: 7px;
+  font-size: 0.76rem;
+}
+
+.app-shell .chip-row {
+  gap: 6px;
+}
+
+.app-shell .chip {
+  min-height: 31px;
+  padding: 6px 9px;
+  font-size: 0.72rem;
+}
+
+.app-shell .version-filter .chip-row {
+  max-height: 126px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 10px;
+  padding: 7px;
+  background: rgba(3, 6, 16, 0.26);
+}
+
+.app-shell input,
+.app-shell select {
+  min-height: 38px;
+  margin-top: 5px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+.app-shell .advanced-block summary {
+  min-height: 38px;
+  font-size: 0.76rem;
+}
+
+.app-shell .primary-action {
+  min-height: 44px;
+  margin-top: 14px;
+}
+
+.app-shell .preview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+
+.app-shell .stage {
+  padding: 18px;
+}
+
+.app-shell .stage-header {
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.app-shell .stage-header .section-title {
+  margin-bottom: 7px;
+  font-size: 1rem;
+}
+
+.app-shell .stage-header p {
+  margin: 0;
+  color: var(--arena-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.app-shell .stage-actions {
+  gap: 6px;
+}
+
+.app-shell .stage-actions > button,
+.app-shell .ghost-action,
+.app-shell .primary-inline {
+  min-height: 38px;
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-size: 0.76rem;
+}
+
+.app-shell .draw-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.app-shell .group-box {
+  border-color: rgba(109, 233, 240, 0.12);
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(150deg, rgba(109, 233, 240, 0.055), transparent 45%), rgba(255, 255, 255, 0.025);
+}
+
+.app-shell .group-name {
+  margin-bottom: 6px;
+  color: var(--arena-gold);
+  font-size: 0.72rem;
+}
+
+.app-shell .draw-row {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 42px;
+  padding: 5px 0;
+}
+
+.app-shell .draw-row img {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+}
+
+.app-shell .selection-status {
+  gap: 8px 10px;
+  margin: 10px 0 12px;
+  border-radius: 10px;
+  padding: 8px 11px;
+}
+
+.app-shell .selection-status strong {
+  font-size: 1.22rem;
+}
+
+.app-shell .progress-shell {
+  height: 6px;
+  margin-bottom: 11px;
+}
+
+.app-shell .battle-grid {
+  gap: 10px;
+}
+
+.app-shell .battle-grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.app-shell .battle-grid.revival {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.app-shell .song-card {
+  gap: 7px;
+  border-color: rgba(109, 233, 240, 0.12);
+  border-radius: 13px;
+  padding: 8px;
+  background: linear-gradient(155deg, rgba(38, 47, 83, 0.82), rgba(10, 13, 29, 0.97));
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.26);
+}
+
+.app-shell .song-card.clickable:hover {
+  border-color: rgba(109, 233, 240, 0.4);
+  transform: translateY(-3px);
+}
+
+.app-shell .jacket-wrap {
+  border-radius: 9px;
+}
+
+.app-shell .title-line {
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.app-shell .artist-line {
+  font-size: 0.72rem;
+}
+
+.app-shell .tag-row {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.app-shell .pill,
+.app-shell .difficulty,
+.app-shell .chart-type-badge {
+  max-width: 100%;
+  min-height: 23px;
+  padding: 4px 7px;
+  font-size: 0.62rem;
+}
+
+.app-shell .chart-panel,
+.app-shell .chart-spec-grid {
+  gap: 4px;
+}
+
+.app-shell .chart-spec {
+  border-radius: 7px;
+  padding: 5px 6px;
+}
+
+.app-shell .chart-spec small {
+  font-size: 0.56rem;
+}
+
+.app-shell .chart-spec b {
+  font-size: 0.68rem;
+}
+
+.app-shell .song-card.compact {
+  gap: 6px;
+  padding: 7px;
+}
+
+.app-shell .song-card.compact .audio-preview {
+  display: none;
+}
+
+.app-shell .audio-preview {
+  display: block;
+  margin-top: auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.app-shell .audio-preview button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(109, 233, 240, 0.2);
+  border-radius: 8px;
+  color: #bffaff;
+  background: rgba(109, 233, 240, 0.065);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+.app-shell .audio-preview.is-playing button {
+  border-color: rgba(255, 117, 185, 0.38);
+  color: #ffd2e8;
+  background: rgba(255, 117, 185, 0.1);
+}
+
+.app-shell .audio-element {
+  display: none;
+}
+
+.app-shell .round-roadmap {
+  gap: 6px;
+  margin: 9px 0 9px;
+}
+
+.app-shell .round-roadmap > div {
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 0.66rem;
+}
+
+.app-shell .duel-prompt {
+  width: fit-content;
+  margin: 0 auto 10px;
+  border: 1px solid rgba(255, 225, 125, 0.22);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: #fff1b9;
+  background: rgba(255, 225, 125, 0.06);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.app-shell .bracket-panel .duel-zone {
+  width: min(660px, 100%);
+  gap: 22px;
+}
+
+.app-shell .bracket-panel .duel-slot {
+  max-width: 318px;
+}
+
+.app-shell .song-card.duel {
+  gap: 7px;
+  padding: 9px;
+}
+
+.app-shell .song-card.duel .title-line {
+  font-size: 1rem;
+}
+
+.app-shell .vs-badge {
+  top: min(41%, 148px);
+  width: 46px;
+  height: 46px;
+  border-width: 1px;
+  font-size: 0.72rem;
+}
+
+.app-shell .trail-grid {
+  gap: 6px;
+}
+
+.app-shell .trail-grid p {
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 0.68rem;
+}
+
+.app-shell .result-stage {
+  padding: 14px;
+}
+
+.app-shell .share-poster {
+  border-radius: 16px;
+  padding: 22px;
+}
+
+.app-shell .poster-header p {
+  font-size: 1.35rem;
+}
+
+.app-shell .poster-header h2 {
+  font-size: 1.8rem;
+}
+
+.app-shell .champion-art {
+  width: 166px;
+  height: 166px;
+}
+
+.stage-intro {
+  padding: 16px;
+  background: rgba(4, 7, 17, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+.stage-intro .stage-intro-inner {
+  width: min(500px, 92vw);
+  border-radius: 20px;
+  padding: 34px 34px 26px;
+}
+
+.stage-intro .stage-intro-title {
+  margin-top: 7px;
+  font-size: clamp(2.4rem, 7vw, 4rem);
+}
+
+.stage-intro .stage-intro-desc {
+  margin-top: 12px;
+  color: #b9c6d9;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.stage-intro .stage-intro-timer {
+  animation-duration: 6200ms;
+}
+
+.stage-intro.intro-champion .stage-intro-timer {
+  animation-duration: 7200ms;
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    width: min(760px, 100%);
+  }
+
+  .app-shell .config-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .control-surface {
+    position: static;
+  }
+
+  .app-shell .battle-grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell .battle-grid.revival {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .app-shell {
+    width: 100%;
+    padding: 12px 12px 34px;
+  }
+
+  .app-shell .topbar {
+    gap: 10px;
+    align-items: start;
+    padding-bottom: 12px;
+  }
+
+  .app-shell h1 {
+    font-size: clamp(1.65rem, 8vw, 2.15rem);
+  }
+
+  .app-shell .phase-badge {
+    min-width: auto;
+    min-height: 34px;
+    padding: 7px 9px;
+    font-size: 0.68rem;
+  }
+
+  .app-shell .cup-context {
+    grid-column: 1 / -1;
+  }
+
+  .app-shell .cup-stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .app-shell .cup-stepper > div {
+    min-height: 34px;
+    padding: 6px 7px;
+    font-size: 0.64rem;
+  }
+
+  .app-shell .control-surface,
+  .app-shell .stage {
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .app-shell .stage-header {
+    display: grid;
+    gap: 9px;
+  }
+
+  .app-shell .stage-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .app-shell .stage-actions > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .app-shell .stage-actions > button:last-child:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .app-shell .preview-grid,
+  .app-shell .draw-grid,
+  .app-shell .battle-grid.four,
+  .app-shell .battle-grid.revival {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .app-shell .draw-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .app-shell .draw-row b {
+    grid-column: 2;
+  }
+
+  .app-shell .title-line,
+  .app-shell .artist-line {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .app-shell .title-line {
+    min-height: 2.16em;
+    line-height: 1.08;
+  }
+
+  .app-shell .chart-spec-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell .designer-spec {
+    grid-column: 1 / -1;
+  }
+
+  .app-shell .round-roadmap {
+    grid-template-columns: repeat(5, minmax(74px, 1fr));
+    overflow-x: auto;
+  }
+
+  .app-shell .bracket-panel {
+    overflow: visible;
+  }
+
+  .app-shell .bracket-panel .duel-zone {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 8px;
+  }
+
+  .app-shell .bracket-panel .duel-slot {
+    max-width: none;
+  }
+
+  .app-shell .song-card.duel {
+    min-height: 0;
+    padding: 6px;
+  }
+
+  .app-shell .song-card.duel .title-line {
+    font-size: 0.8rem;
+  }
+
+  .app-shell .song-card.duel .artist-line {
+    font-size: 0.64rem;
+  }
+
+  .app-shell .duel-zone .pill.cyan {
+    display: none;
+  }
+
+  .app-shell .duel-zone .vs-badge {
+    position: absolute;
+    top: min(24vw, 90px);
+    left: 50%;
+    width: 38px;
+    height: 38px;
+    transform: translate(-50%, -50%);
+  }
+
+  .app-shell .trail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell .share-poster {
+    padding: 12px;
+  }
+
+  .app-shell .share-poster .poster-header p {
+    font-size: 1rem;
+  }
+
+  .app-shell .share-poster .poster-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .app-shell .share-poster .poster-layout {
+    display: block;
+  }
+
+  .app-shell .share-poster .poster-layout > .poster-bracket {
+    display: none;
+  }
+
+  .app-shell .share-poster .champion-art {
+    width: 160px;
+    height: 160px;
+  }
+
+  .app-shell .share-poster .poster-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .share-poster .poster-topfour,
+  .app-shell .share-poster .poster-path {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .app-shell .share-poster .poster-topfour > span,
+  .app-shell .share-poster .poster-path > span {
+    grid-column: 1 / -1;
+  }
+
+  .app-shell .mobile-bracket-details {
+    display: block;
+  }
+
+  .app-shell .mobile-bracket-scroll {
+    overflow-x: auto;
+  }
+
+  .app-shell .mobile-bracket-scroll .poster-bracket {
+    grid-template-columns: repeat(4, minmax(126px, 1fr));
+    width: 560px;
+  }
+
+  .app-shell .poster-domain {
+    position: static;
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .stage-intro .stage-intro-inner {
+    padding: 28px 20px 22px;
+  }
+}
+
+@media (max-width: 430px) {
+  .app-shell {
+    padding-inline: 9px;
+  }
+
+  .app-shell .cup-context span {
+    min-height: 22px;
+    padding: 3px 7px;
+    font-size: 0.6rem;
+  }
+
+  .app-shell .version-filter .chip-row {
+    max-height: 112px;
+  }
+}
+
+@media (max-width: 360px) {
+  .app-shell .draw-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: none) {
+  .app-shell .song-card.clickable:hover,
+  .app-shell button:not(:disabled):hover {
+    transform: none;
+  }
+}

@@ -24,8 +24,9 @@ const DRAFT_KEY = "mmc-yt-draft";
 const API_KEY_SESSION = "mmc-youtube-api-key-session";
 const CANDIDATE_KEY = "mmc-youtube-candidates-v1";
 const SKIPPED_KEY = "mmc-youtube-review-skipped";
+const BATCH_BACKUP_KEY = "mmc-youtube-batch-backup-v1";
 type Draft = Record<string, YouTubeSource>;
-type FilterMode = "all" | "mapped" | "unmapped" | "ready" | "noCandidate" | "skipped";
+type FilterMode = "all" | "mapped" | "unmapped" | "ready" | "quick" | "review" | "noCandidate" | "skipped";
 type ReviewSort = "confidence" | "needsReview" | "library";
 type Notice = { tone: "info" | "success" | "error"; message: string } | null;
 type MatchCandidate = {
@@ -42,11 +43,16 @@ type CandidateBundle = {
   songCount?: number;
   candidates: Record<string, Array<Omit<MatchCandidate, "score"> & { score?: number }>>;
 };
+type BatchBackup = {
+  createdAt: string;
+  acceptedSongIds: string[];
+  draft: Draft;
+};
 
 function loadDraft(): Draft {
   try {
-    const cached = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}") as Draft;
-    return { ...youtubeSources, ...cached };
+    const cached = localStorage.getItem(DRAFT_KEY);
+    return cached === null ? { ...youtubeSources } : JSON.parse(cached) as Draft;
   } catch {
     return { ...youtubeSources };
   }
@@ -54,7 +60,16 @@ function loadDraft(): Draft {
 
 function loadCandidates(): CandidateMap {
   try {
-    return JSON.parse(localStorage.getItem(CANDIDATE_KEY) || "{}") as CandidateMap;
+    const cached = JSON.parse(localStorage.getItem(CANDIDATE_KEY) || "{}") as CandidateMap;
+    return Object.fromEntries(
+      Object.entries(cached).map(([songId, entries]) => [
+        songId,
+        entries.map((entry) => ({
+          ...entry,
+          thumbnail: entry.thumbnail || `https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg`
+        }))
+      ])
+    );
   } catch {
     return {};
   }
@@ -65,6 +80,15 @@ function loadSkipped(): Record<string, true> {
     return JSON.parse(localStorage.getItem(SKIPPED_KEY) || "{}") as Record<string, true>;
   } catch {
     return {};
+  }
+}
+
+function loadBatchBackup(): BatchBackup | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(BATCH_BACKUP_KEY) || "null") as BatchBackup | null;
+    return value?.draft && Array.isArray(value.acceptedSongIds) ? value : null;
+  } catch {
+    return null;
   }
 }
 
@@ -85,6 +109,7 @@ export default function AdminApp() {
   const [rowStatus, setRowStatus] = useState<Record<string, Notice>>({});
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState("");
+  const [batchBackup, setBatchBackup] = useState<BatchBackup | null>(loadBatchBackup);
   const [notice, setNotice] = useState<Notice>({ tone: "info", message: "先从左侧选择歌曲，在右侧完成匹配；保存后可自动进入下一首未映射歌曲。" });
 
   const queryFiltered = useMemo(() => {
@@ -92,41 +117,52 @@ export default function AdminApp() {
     return songs.filter((song) => !q || normalize(`${song.title} ${song.artist} ${song.id}`).includes(q));
   }, [query]);
 
+  const quickRecommendations = useMemo(
+    () => buildQuickRecommendations(songs, draft, candidates, skippedSongs),
+    [draft, candidates, skippedSongs]
+  );
+
   const filtered = useMemo(() => {
       const items = queryFiltered.filter((song) => {
         const mapped = Boolean(draft[song.id]);
         const hasCandidates = Boolean(candidates[song.id]?.length);
         const scanned = hasOwn(candidates, song.id);
         const skipped = Boolean(skippedSongs[song.id]);
+        const quick = quickRecommendations.has(song.id);
         if (filterMode === "mapped") return mapped;
         if (filterMode === "unmapped") return !mapped;
         if (filterMode === "ready") return !mapped && hasCandidates && !skipped;
+        if (filterMode === "quick") return !mapped && quick;
+        if (filterMode === "review") return !mapped && hasCandidates && !skipped && !quick;
         if (filterMode === "noCandidate") return !mapped && scanned && !hasCandidates;
         if (filterMode === "skipped") return !mapped && skipped;
         return true;
       });
-      if (filterMode !== "ready" || reviewSort === "library") return items;
+      if (!["ready", "quick", "review"].includes(filterMode) || reviewSort === "library") return items;
       return [...items].sort((a, b) => {
         const scoreA = candidates[a.id]?.[0]?.score ?? -Infinity;
         const scoreB = candidates[b.id]?.[0]?.score ?? -Infinity;
         return reviewSort === "confidence" ? scoreB - scoreA : scoreA - scoreB;
       });
-    }, [queryFiltered, filterMode, reviewSort, draft, candidates, skippedSongs]);
+    }, [queryFiltered, filterMode, reviewSort, draft, candidates, skippedSongs, quickRecommendations]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
   const pageItems = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
   const activeSong = songs.find((song) => song.id === activeSongId) ?? pageItems[0] ?? songs[0];
   const activeSource = activeSong ? draft[activeSong.id] : undefined;
-  const candidateSource = activeSong ? parseYouTube(inputs[activeSong.id] ?? (activeSource ? sourceToUrl(activeSource) : "")) : null;
   const activeSearchQuery = activeSong ? searchQueries[activeSong.id] ?? buildSearchQuery(activeSong) : "";
   const activeCandidates = activeSong ? candidates[activeSong.id] ?? [] : [];
+  const candidateSource = activeSong ? parseYouTube(inputs[activeSong.id] ?? (activeSource ? sourceToUrl(activeSource) : "")) : null;
+  const reviewSource = candidateSource ?? (activeCandidates[0] ? { videoId: activeCandidates[0].videoId } : null);
   const mappedCount = songs.filter((song) => draft[song.id]).length;
   const shippedCount = songs.filter((song) => youtubeSources[song.id]).length;
   const changedCount = songs.filter((song) => JSON.stringify(draft[song.id]) !== JSON.stringify(youtubeSources[song.id])).length;
   const unmappedCount = songs.length - mappedCount;
   const scannedCount = songs.filter((song) => hasOwn(candidates, song.id)).length;
   const readyCount = songs.filter((song) => !draft[song.id] && candidates[song.id]?.length && !skippedSongs[song.id]).length;
+  const quickCount = quickRecommendations.size;
+  const manualReviewCount = Math.max(0, readyCount - quickCount);
   const noCandidateCount = songs.filter((song) => !draft[song.id] && hasOwn(candidates, song.id) && !candidates[song.id]?.length).length;
   const skippedCount = songs.filter((song) => !draft[song.id] && skippedSongs[song.id]).length;
 
@@ -149,12 +185,12 @@ export default function AdminApp() {
       if (candidateIndex >= 0 && candidateIndex < 6 && activeCandidates[candidateIndex]) {
         event.preventDefault();
         chooseCandidate(activeSong, activeCandidates[candidateIndex]);
-      } else if (event.key === " " && candidateSource) {
+      } else if (event.key === " " && reviewSource) {
         event.preventDefault();
-        setPreviewSource(previewSource?.videoId === candidateSource.videoId ? null : candidateSource);
-      } else if (event.key === "Enter" && candidateSource) {
+        setPreviewSource(previewSource?.videoId === reviewSource.videoId ? null : reviewSource);
+      } else if (event.key === "Enter" && reviewSource) {
         event.preventDefault();
-        saveSource(activeSong.id, candidateSource, true);
+        saveSource(activeSong.id, reviewSource, true);
       } else if (event.key.toLowerCase() === "s") {
         event.preventDefault();
         skipReviewSong(activeSong.id);
@@ -163,12 +199,16 @@ export default function AdminApp() {
 
     window.addEventListener("keydown", handleReviewKeys);
     return () => window.removeEventListener("keydown", handleReviewKeys);
-  }, [activeSong, activeCandidates, candidateSource, previewSource, draft, skippedSongs, queryFiltered, filterMode]);
+  }, [activeSong, activeCandidates, candidateSource, reviewSource, previewSource, draft, skippedSongs, queryFiltered, filterMode]);
 
-  function persist(next: Draft, message?: string) {
+  function persist(next: Draft, message?: string, preserveBatchBackup = false) {
     try {
       setDraft(next);
       localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+      if (!preserveBatchBackup) {
+        localStorage.removeItem(BATCH_BACKUP_KEY);
+        setBatchBackup(null);
+      }
       if (message) setNotice({ tone: "success", message });
     } catch {
       setNotice({ tone: "error", message: "浏览器草稿保存失败，请立即导出 JSON 备份。" });
@@ -179,9 +219,9 @@ export default function AdminApp() {
     setCandidates((current) => {
       const next = updater(current);
       try {
-        localStorage.setItem(CANDIDATE_KEY, JSON.stringify(next));
+        localStorage.setItem(CANDIDATE_KEY, JSON.stringify(compactCandidateMap(next)));
       } catch {
-        setNotice({ tone: "error", message: "候选包超过浏览器存储上限，请缩小生成批次后重新导入。" });
+        setNotice({ tone: "error", message: "候选包超过浏览器存储上限。当前映射草稿没有丢失，请改用 200–300 首分批导入。" });
       }
       return next;
     });
@@ -190,6 +230,53 @@ export default function AdminApp() {
   function updateSkippedSongs(next: Record<string, true>) {
     setSkippedSongs(next);
     localStorage.setItem(SKIPPED_KEY, JSON.stringify(next));
+  }
+
+  function acceptQuickRecommendations() {
+    const entries = [...quickRecommendations.entries()];
+    if (!entries.length) {
+      setNotice({ tone: "info", message: "当前没有达到严格门槛的候选，请进入“需人工核对”继续处理。" });
+      return;
+    }
+    const accepted = window.confirm(
+      `将批量采用 ${entries.length} 首严格匹配候选。\n\n规则包含：曲名命中、候选分数 ≥ 86、与第二名有明显分差、排除谱面/实机/Shorts，并阻止重复视频。\n\n操作后可立即撤销一次。是否继续？`
+    );
+    if (!accepted) return;
+
+    const backup: BatchBackup = {
+      createdAt: new Date().toISOString(),
+      acceptedSongIds: entries.map(([songId]) => songId),
+      draft
+    };
+    try {
+      localStorage.setItem(BATCH_BACKUP_KEY, JSON.stringify(backup));
+      setBatchBackup(backup);
+    } catch {
+      setNotice({ tone: "error", message: "无法创建批量操作备份，本次没有修改映射。请先导出当前 JSON 后重试。" });
+      return;
+    }
+
+    const next = { ...draft };
+    entries.forEach(([songId, candidate]) => {
+      next[songId] = { videoId: candidate.videoId };
+    });
+    persist(next, `已批量采用 ${entries.length} 首严格匹配候选。建议先处理剩余人工核对队列，再统一导出。`, true);
+    setFilterMode("review");
+    setPage(0);
+    setPreviewSource(null);
+    const firstReview = songs.find((song) => !next[song.id] && candidates[song.id]?.length && !skippedSongs[song.id]);
+    if (firstReview) setActiveSongId(firstReview.id);
+  }
+
+  function undoQuickBatch() {
+    if (!batchBackup) return;
+    const restoredCount = batchBackup.acceptedSongIds.length;
+    persist(batchBackup.draft, `已撤销上次批量采用，恢复 ${restoredCount} 首映射。`, true);
+    localStorage.removeItem(BATCH_BACKUP_KEY);
+    setBatchBackup(null);
+    setFilterMode("quick");
+    setPage(0);
+    setPreviewSource(null);
   }
 
   function selectSong(song: Song) {
@@ -407,11 +494,17 @@ export default function AdminApp() {
       });
 
       updateCandidateMap(() => next);
-      setFilterMode("ready");
+      const strictRecommendations = buildQuickRecommendations(songs, draft, next, skippedSongs);
+      setFilterMode(strictRecommendations.size ? "quick" : "ready");
       setPage(0);
-      const first = songs.find((song) => !draft[song.id] && next[song.id]?.length && !skippedSongs[song.id]);
+      const first = strictRecommendations.size
+        ? songs.find((song) => strictRecommendations.has(song.id))
+        : songs.find((song) => !draft[song.id] && next[song.id]?.length && !skippedSongs[song.id]);
       if (first) selectSong(first);
-      setNotice({ tone: "success", message: `候选包已导入：扫描 ${imported} 首，其中 ${withResults} 首有可审核候选。可直接使用键盘连续确认。` });
+      setNotice({
+        tone: "success",
+        message: `候选包已导入：扫描 ${imported} 首，${withResults} 首有候选，其中 ${strictRecommendations.size} 首达到严格推荐门槛。可先批量采用，再键盘核对剩余项。`
+      });
     } catch (error) {
       setNotice({ tone: "error", message: error instanceof Error ? `候选包导入失败：${error.message}` : "候选包导入失败" });
     }
@@ -494,8 +587,34 @@ export default function AdminApp() {
       <section className="admin-overview" aria-label="映射概览">
         <div><span>已完成</span><strong>{mappedCount}</strong><small>/ {songs.length}</small></div>
         <div><span>剩余未匹配</span><strong>{unmappedCount}</strong><small>首</small></div>
-        <div className={readyCount ? "candidate-ready" : ""}><span>候选待审核</span><strong>{readyCount}</strong><small>/ 已扫描 {scannedCount}</small></div>
+        <div className={quickCount ? "candidate-ready" : ""}><span>严格推荐</span><strong>{quickCount}</strong><small>可批量采用</small></div>
+        <div><span>人工核对</span><strong>{manualReviewCount}</strong><small>/ 已扫描 {scannedCount}</small></div>
         <div className={changedCount ? "changed" : ""}><span>待导出变更</span><strong>{changedCount}</strong><small>首</small></div>
+      </section>
+
+      <section className="admin-fast-lane" aria-label="千首曲库快速处理流程">
+        <div className="admin-fast-copy">
+          <span>1000+ FAST LANE</span>
+          <b>候选包 → 严格推荐批量采用 → 剩余歌曲键盘快审</b>
+          <small>严格推荐同时检查曲名、分数、第一二名差距、负面关键词和重复视频；不满足门槛的一律留给人工。</small>
+        </div>
+        <ol>
+          <li><b>1</b><span>导入候选包<small>一次生成，断点续跑</small></span></li>
+          <li><b>2</b><span>先清严格推荐<small>{quickCount} 首可处理</small></span></li>
+          <li><b>3</b><span>再核对剩余<small>Space 试听 · Enter 确认</small></span></li>
+        </ol>
+        <div className="admin-fast-actions">
+          <button className="primary-inline" onClick={acceptQuickRecommendations} disabled={!quickCount}>
+            <WandSparkles size={16} />
+            批量采用严格推荐 · {quickCount}
+          </button>
+          {batchBackup ? (
+            <button className="ghost-action" onClick={undoQuickBatch}>
+              <RotateCcw size={16} />
+              撤销上次批量 · {batchBackup.acceptedSongIds.length}
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <section className="admin-console">
@@ -504,6 +623,8 @@ export default function AdminApp() {
           <select aria-label="映射状态" value={filterMode} onChange={(event) => setFilterMode(event.target.value as FilterMode)}>
             <option value="unmapped">仅未匹配 · {unmappedCount}</option>
             <option value="ready">候选待审核 · {readyCount}</option>
+            <option value="quick">严格推荐 · {quickCount}</option>
+            <option value="review">需人工核对 · {manualReviewCount}</option>
             <option value="noCandidate">无候选 · {noCandidateCount}</option>
             <option value="skipped">已跳过 · {skippedCount}</option>
             <option value="mapped">仅已匹配 · {mappedCount}</option>
@@ -525,7 +646,7 @@ export default function AdminApp() {
           <div className="admin-queue-head">
             <div><ListMusic size={18} /><b>歌曲队列</b><span>{filtered.length} 首</span></div>
             <div className="admin-queue-controls">
-              {filterMode === "ready" ? (
+              {["ready", "quick", "review"].includes(filterMode) ? (
                 <select aria-label="候选排序" value={reviewSort} onChange={(event) => setReviewSort(event.target.value as ReviewSort)}>
                   <option value="confidence">推荐优先</option>
                   <option value="needsReview">需核对优先</option>
@@ -542,13 +663,17 @@ export default function AdminApp() {
             {pageItems.map((song, index) => {
               const mapped = Boolean(draft[song.id]);
               const ready = !mapped && Boolean(candidates[song.id]?.length) && !skippedSongs[song.id];
+              const quick = quickRecommendations.has(song.id);
               const skipped = !mapped && Boolean(skippedSongs[song.id]);
+              const noCandidate = !mapped && hasOwn(candidates, song.id) && !candidates[song.id]?.length;
               return (
                 <button className={`admin-song-row ${song.id === activeSong?.id ? "active" : ""}`} onClick={() => selectSong(song)} key={song.id}>
                   <span className="admin-song-number">{safePage * pageSize + index + 1}</span>
                   <img src={song.jacket} alt="" loading="lazy" />
                   <span className="admin-song-copy"><b>{song.title}</b><small>{song.artist}</small></span>
-                  <span className={`mapping-dot ${mapped ? "mapped" : ready ? "ready" : skipped ? "skipped" : ""}`} title={mapped ? "已匹配" : ready ? "候选待审核" : skipped ? "已跳过" : "未匹配"} />
+                  <span className={`queue-map-state ${mapped ? "mapped" : quick ? "quick" : ready ? "ready" : skipped ? "skipped" : noCandidate ? "empty" : ""}`}>
+                    {mapped ? "完成" : quick ? "严选" : ready ? "核对" : skipped ? "跳过" : noCandidate ? "无果" : "待扫"}
+                  </span>
                 </button>
               );
             })}
@@ -606,9 +731,27 @@ export default function AdminApp() {
                     </div>
                     <div className="admin-review-hotkeys" aria-label="键盘审核快捷键">
                       <span><kbd>1–6</kbd> 选候选</span>
-                      <span><kbd>Space</kbd> 试听</span>
-                      <span><kbd>Enter</kbd> 确认下一首</span>
+                      <span><kbd>Space</kbd> 试听推荐/已选</span>
+                      <span><kbd>Enter</kbd> 确认推荐/已选并下一首</span>
                       <button onClick={() => skipReviewSong(activeSong.id)}><kbd>S</kbd> 暂时跳过</button>
+                    </div>
+                    <div className={`admin-recommended-pick ${quickRecommendations.has(activeSong.id) ? "strict" : ""}`}>
+                      <div>
+                        <span>{quickRecommendations.has(activeSong.id) ? "严格推荐 · 可快速确认" : "当前推荐 · 建议试听"}</span>
+                        <b>{activeCandidates[0].title}</b>
+                        <small>{activeCandidates[0].channelTitle} · 匹配分 {activeCandidates[0].score}</small>
+                      </div>
+                      <button
+                        className="ghost-action"
+                        onClick={() => setPreviewSource(previewSource?.videoId === activeCandidates[0].videoId ? null : { videoId: activeCandidates[0].videoId })}
+                      >
+                        <Play size={14} />
+                        {previewSource?.videoId === activeCandidates[0].videoId ? "收起试听" : "试听推荐"}
+                      </button>
+                      <button className="primary-inline" onClick={() => chooseCandidate(activeSong, activeCandidates[0], true)}>
+                        <CheckCircle2 size={14} />
+                        确认推荐并下一首
+                      </button>
                     </div>
                     <div className="admin-candidate-list">
                       {activeCandidates.map((candidate, index) => {
@@ -828,6 +971,55 @@ function confidenceClass(score: number) {
   if (score >= 78) return "high";
   if (score >= 52) return "medium";
   return "low";
+}
+
+function buildQuickRecommendations(
+  library: Song[],
+  sourceMap: Draft,
+  candidateMap: CandidateMap,
+  skippedMap: Record<string, true>
+) {
+  const recommendations = new Map<string, MatchCandidate>();
+  const usedVideos = new Set(Object.values(sourceMap).map((source) => source.videoId));
+
+  library.forEach((song) => {
+    if (sourceMap[song.id] || skippedMap[song.id]) return;
+    const entries = candidateMap[song.id] || [];
+    const candidate = strictRecommendation(song, entries);
+    if (!candidate || usedVideos.has(candidate.videoId)) return;
+    recommendations.set(song.id, candidate);
+    usedVideos.add(candidate.videoId);
+  });
+
+  return recommendations;
+}
+
+function strictRecommendation(song: Song, entries: MatchCandidate[]) {
+  const [first, second] = entries;
+  if (!first || first.score < 86) return null;
+  if (second && first.score - second.score < 12) return null;
+
+  const expectedTitle = normalizeForMatch(song.title).replace(/\s+/g, "");
+  const candidateTitle = normalizeForMatch(first.title).replace(/\s+/g, "");
+  const candidateContext = normalizeForMatch(`${first.title} ${first.channelTitle}`);
+  const expectedArtist = normalizeForMatch(song.artist);
+  const titleMatched = expectedTitle.length >= 2 && candidateTitle.includes(expectedTitle);
+  const artistMatched = expectedArtist.length >= 2 && candidateContext.includes(expectedArtist);
+  const officialSignal = /official|topic|sega|maimai|舞萌|でらっくす/.test(candidateContext);
+  const suspicious = /譜面|gameplay|手元|ap\+?|fullcombo|創作|chart|外部出力|shorts|切り抜き|reaction|解説|実況/.test(
+    candidateContext.replace(/\s+/g, "")
+  );
+
+  return titleMatched && (artistMatched || officialSignal) && !suspicious ? first : null;
+}
+
+function compactCandidateMap(candidateMap: CandidateMap) {
+  return Object.fromEntries(
+    Object.entries(candidateMap).map(([songId, entries]) => [
+      songId,
+      entries.map(({ videoId, title, channelTitle, score }) => ({ videoId, title, channelTitle, score }))
+    ])
+  );
 }
 
 function decodeEntities(value: string) {

@@ -6,3 +6,14 @@ npm-debug.log
 README.md
 asset-sources.json
 deploy/.htpasswd
+.env
+.env.*
+youtubeCandidates.json
+youtubeCandidates.json.tmp
+data/raw
+game-file-scan*.json
+jp_asset_tasks.json
+jp_assets_manifest.csv
+public/assets/jackets/jp-db
+public/assets/previews/jp-db
+deploy/private-assets

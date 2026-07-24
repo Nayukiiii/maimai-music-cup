@@ -347,7 +347,7 @@ export default function App() {
                 : "谱面杯：以「歌 + 单一难度谱面」参赛，整届固定同难度对决。"}
             </p>
 
-            <FilterBlock title="分类">
+            <FilterBlock title="分类" className="category-filter">
               {categories.map((category) => (
                 <Chip
                   key={category}
@@ -359,7 +359,7 @@ export default function App() {
               ))}
             </FilterBlock>
 
-            <FilterBlock title="版本">
+            <FilterBlock title="版本" className="version-filter">
               {versions.map((version) => (
                 <Chip
                   key={version}
@@ -373,7 +373,7 @@ export default function App() {
 
             {filters.mode === "chart" ? (
               <>
-                <FilterBlock title="难度">
+                <FilterBlock title="难度" className="difficulty-filter">
                   {difficulties.map((difficulty) => (
                     <Chip
                       key={difficulty}
@@ -646,6 +646,7 @@ export default function App() {
           />
           <ProgressBar value={matchIndex} max={roundEntries.length / 2} />
           <RoundRoadmap currentRound={currentRoundName} history={history} />
+          <div className="duel-prompt" role="status">点击一侧卡片，送它晋级下一轮</div>
           <div className="duel-zone">
             {currentMatch.map((entry, index) => (
               <div className={`duel-slot side-${index + 1}`} key={entry.id}>
@@ -755,7 +756,7 @@ function StageIntro({ intro }: { intro: ReturnType<typeof getStageIntro> }) {
     setVisible(Boolean(intro));
     setLeaving(false);
     if (!intro) return;
-    const duration = intro.variant === "champion" ? 6400 : 5200;
+    const duration = intro.variant === "champion" ? 7200 : 6200;
     const leaveTimer = window.setTimeout(() => setLeaving(true), duration - 520);
     const hideTimer = window.setTimeout(() => setVisible(false), duration);
     return () => {
@@ -917,9 +918,9 @@ function MiniEntry({ entry, winner }: { entry: CupEntry; winner?: boolean }) {
   );
 }
 
-function FilterBlock({ title, children }: { title: string; children: ReactNode }) {
+function FilterBlock({ title, className = "", children }: { title: string; className?: string; children: ReactNode }) {
   return (
-    <div className="filter-block">
+    <div className={`filter-block ${className}`}>
       <div className="filter-title">{title}</div>
       <div className="chip-row">{children}</div>
     </div>

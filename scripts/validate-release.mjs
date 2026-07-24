@@ -4,6 +4,8 @@ import process from "node:process";
 
 const root = process.cwd();
 const requireAssets = process.argv.includes("--require-assets");
+const privateAssetRoot = path.resolve(process.env.MMC_PRIVATE_ASSET_ROOT || path.join(root, "deploy/private-assets"));
+const assetRoots = [path.join(root, "public"), privateAssetRoot];
 const songsPath = path.join(root, "src/data/importedSongs.json");
 const youtubePath = path.join(root, "src/data/youtubeSources.json");
 const songs = JSON.parse(fs.readFileSync(songsPath, "utf8"));
@@ -100,7 +102,11 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(requireAssets ? "发布预检通过（含本地资源）。" : "数据预检通过；部署前请再运行 release:check:assets。");
+console.log(
+  requireAssets
+    ? `私有资源预检通过（资源根目录：${privateAssetRoot}）。`
+    : "数据预检通过；JP 版权资源为可选的部署机私有挂载，不进入仓库或镜像。"
+);
 
 function nonEmpty(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -110,5 +116,5 @@ function assetExists(webPath) {
   if (!nonEmpty(webPath)) return false;
   if (/^https?:\/\//i.test(webPath)) return true;
   const relative = webPath.replace(/^\/+/, "");
-  return fs.existsSync(path.join(root, "public", relative));
+  return assetRoots.some((assetRoot) => fs.existsSync(path.join(assetRoot, relative)));
 }

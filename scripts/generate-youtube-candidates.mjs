@@ -14,51 +14,62 @@ await verifyYtDlp();
 
 console.log(`曲库 ${songs.length} 首，本轮计划扫描 ${selected.length} 首，候选数 ${options.candidates}。`);
 console.log(`输出：${outputPath}`);
+console.log(`并发：${options.concurrency}；单 worker 请求间隔：${options.delay}ms。`);
 console.log("仅提取搜索结果元数据，不下载视频或音频；Ctrl+C 可停止，下次会从检查点继续。");
 
 let completed = 0;
 let skipped = 0;
 let failed = 0;
+let cursor = 0;
 
-for (const [index, song] of selected.entries()) {
-  if (!options.force && Object.hasOwn(bundle.candidates, song.id)) {
-    skipped += 1;
-    continue;
-  }
-
-  const query = `${song.title} ${song.artist} maimai`;
-  const marker = `[${index + 1}/${selected.length}] ${song.title}`;
-  try {
-    const entries = await searchYouTube(query, options.candidates, options.timeout);
-    bundle.candidates[song.id] = entries.map((entry) => ({
-      videoId: entry.id,
-      title: entry.title || entry.id,
-      channelTitle: entry.channel || entry.uploader || "未知频道",
-      thumbnail: entry.thumbnail || pickThumbnail(entry.thumbnails, entry.id),
-      query
-    }));
-    delete bundle.errors[song.id];
-    completed += 1;
-    console.log(`${marker} → ${bundle.candidates[song.id].length} 条`);
-  } catch (error) {
-    bundle.errors[song.id] = error instanceof Error ? error.message : String(error);
-    failed += 1;
-    console.error(`${marker} → 失败：${bundle.errors[song.id]}`);
-  }
-
-  bundle.generatedAt = new Date().toISOString();
-  bundle.songCount = songs.length;
-  writeCheckpoint(outputPath, bundle);
-  if (options.delay > 0) await wait(options.delay);
-}
+await Promise.all(Array.from({ length: Math.min(options.concurrency, Math.max(1, selected.length)) }, (_, workerIndex) => runWorker(workerIndex + 1)));
 
 console.log(`完成：新增 ${completed}，已有跳过 ${skipped}，失败 ${failed}。`);
 console.log("打开 /admin，点击“导入候选包”选择该 JSON，即可开始键盘审核。");
+
+async function runWorker(workerId) {
+  while (cursor < selected.length) {
+    const index = cursor;
+    cursor += 1;
+    const song = selected[index];
+
+    if (!options.force && Object.hasOwn(bundle.candidates, song.id)) {
+      skipped += 1;
+      continue;
+    }
+
+    const query = `${song.title} ${song.artist} maimai`;
+    const marker = `[${index + 1}/${selected.length} · W${workerId}] ${song.title}`;
+    try {
+      const entries = await searchYouTube(query, options.candidates, options.timeout);
+      bundle.candidates[song.id] = entries.map((entry) => ({
+        videoId: entry.id,
+        title: entry.title || entry.id,
+        channelTitle: entry.channel || entry.uploader || "未知频道",
+        thumbnail: entry.thumbnail || pickThumbnail(entry.thumbnails, entry.id),
+        query
+      }));
+      delete bundle.errors[song.id];
+      completed += 1;
+      console.log(`${marker} → ${bundle.candidates[song.id].length} 条`);
+    } catch (error) {
+      bundle.errors[song.id] = error instanceof Error ? error.message : String(error);
+      failed += 1;
+      console.error(`${marker} → 失败：${bundle.errors[song.id]}`);
+    }
+
+    bundle.generatedAt = new Date().toISOString();
+    bundle.songCount = songs.length;
+    writeCheckpoint(outputPath, bundle);
+    if (options.delay > 0) await wait(options.delay);
+  }
+}
 
 function parseArgs(args) {
   const values = {
     output: "youtubeCandidates.json",
     candidates: 5,
+    concurrency: 2,
     offset: 0,
     limit: 0,
     delay: 900,
@@ -72,6 +83,7 @@ function parseArgs(args) {
     const next = args[index + 1];
     if (arg === "--output" && next) values.output = next, index += 1;
     else if (arg === "--candidates" && next) values.candidates = clamp(Number(next), 1, 10), index += 1;
+    else if (arg === "--concurrency" && next) values.concurrency = clamp(Math.floor(Number(next)), 1, 6), index += 1;
     else if (arg === "--offset" && next) values.offset = Math.max(0, Number(next) || 0), index += 1;
     else if (arg === "--limit" && next) values.limit = Math.max(0, Number(next) || 0), index += 1;
     else if (arg === "--delay" && next) values.delay = Math.max(0, Number(next) || 0), index += 1;
@@ -79,7 +91,7 @@ function parseArgs(args) {
     else if (arg === "--include-mapped") values.onlyUnmapped = false;
     else if (arg === "--force") values.force = true;
     else if (arg === "--help") {
-      console.log("npm run candidates:generate -- [--limit 100] [--offset 0] [--candidates 5] [--delay 900] [--output youtubeCandidates.json] [--force] [--include-mapped]");
+      console.log("npm run candidates:generate -- [--limit 100] [--offset 0] [--candidates 5] [--concurrency 2] [--delay 900] [--output youtubeCandidates.json] [--force] [--include-mapped]");
       process.exit(0);
     }
   }

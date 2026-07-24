@@ -1,5 +1,5 @@
-import { Check, Disc3, Volume2 } from "lucide-react";
-import { useState } from "react";
+import { Check, Disc3, Pause, Play, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, SyntheticEvent } from "react";
 import { getYouTubeSource } from "../data/youtube";
 import { CupEntry } from "../types";
@@ -26,6 +26,8 @@ const PLACEHOLDER_DESIGNERS = new Set(["maimainet", "-", "－", "ー", ""]);
 
 export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel, onSelect }: SongCardProps) {
   const [audioFailed, setAudioFailed] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const clickable = Boolean(onSelect) && !disabled;
   const difficulty = entry.chart?.difficulty;
   const designer = entry.chart?.designer?.trim();
@@ -34,6 +36,29 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
   const chartTypeLabel = entry.chart ? getChartTypeLabel(chartType, entry.songId) : "";
   const showBpm = Boolean(entry.bpm) && entry.bpm > 0;
   const ytSource = getYouTubeSource(entry.songId);
+
+  useEffect(() => {
+    setAudioFailed(false);
+    setAudioPlaying(false);
+    return () => audioRef.current?.pause();
+  }, [entry.previewAudio]);
+
+  async function toggleAudioPreview() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (!audio.paused) {
+      audio.pause();
+      setAudioPlaying(false);
+      return;
+    }
+    try {
+      await audio.play();
+      setAudioPlaying(true);
+    } catch {
+      setAudioFailed(true);
+      setAudioPlaying(false);
+    }
+  }
 
   return (
     <article
@@ -100,12 +125,23 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
       )}
 
       {entry.previewAudio && !audioFailed ? (
-        <span className="audio-preview" onClick={(event) => event.stopPropagation()}>
-          <span>
-            <Volume2 size={14} />
-            Preview
-          </span>
-          <audio controls preload="none" src={entry.previewAudio} onError={() => setAudioFailed(true)} />
+        <span className={`audio-preview ${audioPlaying ? "is-playing" : ""}`} onClick={(event) => event.stopPropagation()}>
+          <button type="button" onClick={toggleAudioPreview} aria-label={`${audioPlaying ? "暂停" : "播放"} ${entry.title} 试听`}>
+            {audioPlaying ? <Pause size={14} /> : <Play size={14} />}
+            <span>{audioPlaying ? "暂停试听" : "试听 30s"}</span>
+          </button>
+          <audio
+            ref={audioRef}
+            className="audio-element"
+            preload="none"
+            src={entry.previewAudio}
+            onPause={() => setAudioPlaying(false)}
+            onEnded={() => setAudioPlaying(false)}
+            onError={() => {
+              setAudioFailed(true);
+              setAudioPlaying(false);
+            }}
+          />
         </span>
       ) : entry.previewAudio && audioFailed ? (
         <span className="audio-preview is-unavailable">

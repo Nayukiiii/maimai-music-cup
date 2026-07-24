@@ -1,0 +1,455 @@
+/* Final Admin density layer for four-digit libraries. */
+
+.admin-workbench-shell {
+  width: min(1280px, 100%);
+  padding: 18px 20px 40px;
+}
+
+.admin-workbench-shell .admin-bar {
+  gap: 18px;
+  margin-bottom: 13px;
+  border-bottom: 1px solid rgba(109, 233, 240, 0.14);
+  padding-bottom: 15px;
+}
+
+.admin-workbench-shell .admin-title {
+  font-size: clamp(1.75rem, 3vw, 2.55rem);
+  line-height: 1.05;
+}
+
+.admin-workbench-shell .admin-subtitle {
+  max-width: 58em;
+  margin-top: 7px;
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.admin-workbench-shell .admin-overview {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.admin-workbench-shell .admin-overview > div {
+  min-width: 0;
+  border-color: rgba(109, 233, 240, 0.13);
+  border-radius: 11px;
+  padding: 10px 12px;
+  background: linear-gradient(145deg, rgba(25, 31, 57, 0.88), rgba(10, 13, 28, 0.94));
+}
+
+.admin-workbench-shell .admin-overview span,
+.admin-workbench-shell .admin-overview small {
+  overflow: hidden;
+  font-size: 0.65rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-workbench-shell .admin-overview strong {
+  font-size: 1.35rem;
+}
+
+.admin-fast-lane {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(420px, 1.35fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 225, 125, 0.2);
+  border-radius: 13px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 225, 125, 0.1), transparent 36%),
+    linear-gradient(120deg, rgba(25, 30, 54, 0.96), rgba(10, 13, 28, 0.96));
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.22);
+}
+
+.admin-fast-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-fast-copy > span {
+  color: var(--gold);
+  font-size: 0.56rem;
+  font-weight: 1000;
+  letter-spacing: 0.16em;
+}
+
+.admin-fast-copy > b {
+  color: #f6f9ff;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.admin-fast-copy > small {
+  color: #7f90a6;
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.admin-fast-lane ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-fast-lane li {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.admin-fast-lane li > b {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid rgba(109, 233, 240, 0.28);
+  border-radius: 50%;
+  color: #6de9f0;
+  font-size: 0.64rem;
+}
+
+.admin-fast-lane li > span {
+  display: grid;
+  min-width: 0;
+  color: #dce7f5;
+  font-size: 0.65rem;
+  font-weight: 900;
+}
+
+.admin-fast-lane li small {
+  overflow: hidden;
+  color: #72839a;
+  font-size: 0.55rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-fast-actions {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.admin-fast-actions button {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 0.66rem;
+}
+
+.admin-workbench-shell .admin-console {
+  top: 6px;
+  border-radius: 13px;
+  padding: 10px;
+}
+
+.admin-workbench-shell .admin-toolbar {
+  gap: 6px;
+}
+
+.admin-workbench-shell .admin-toolbar > button,
+.admin-workbench-shell .admin-toolbar > label,
+.admin-workbench-shell .admin-toolbar > select {
+  min-height: 38px;
+  font-size: 0.68rem;
+}
+
+.admin-workbench-shell .admin-search {
+  flex-basis: 220px;
+}
+
+.admin-workbench-shell .admin-workbench {
+  grid-template-columns: minmax(320px, 0.7fr) minmax(0, 1.3fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.admin-workbench-shell .admin-queue-panel,
+.admin-workbench-shell .admin-editor-panel {
+  border-color: rgba(109, 233, 240, 0.13);
+  border-radius: 13px;
+}
+
+.admin-workbench-shell .admin-editor-panel {
+  position: static;
+  padding: 14px;
+}
+
+.admin-workbench-shell .admin-song-list {
+  max-height: 650px;
+}
+
+.admin-workbench-shell .admin-song-row {
+  grid-template-columns: 28px 42px minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 9px;
+}
+
+.admin-workbench-shell .admin-song-row img {
+  width: 42px;
+  height: 42px;
+}
+
+.queue-map-state {
+  min-width: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 3px 5px;
+  color: #718198;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.52rem;
+  font-weight: 950;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.queue-map-state.mapped {
+  border-color: rgba(124, 255, 107, 0.23);
+  color: #caffc2;
+  background: rgba(124, 255, 107, 0.07);
+}
+
+.queue-map-state.quick {
+  border-color: rgba(255, 225, 125, 0.32);
+  color: #fff0b5;
+  background: rgba(255, 225, 125, 0.08);
+}
+
+.queue-map-state.ready {
+  border-color: rgba(109, 233, 240, 0.24);
+  color: #bffaff;
+  background: rgba(109, 233, 240, 0.07);
+}
+
+.queue-map-state.skipped {
+  border-color: rgba(255, 117, 185, 0.25);
+  color: #ffc8e2;
+  background: rgba(255, 117, 185, 0.07);
+}
+
+.queue-map-state.empty {
+  border-color: rgba(255, 120, 144, 0.22);
+  color: #ffbdc9;
+  background: rgba(255, 120, 144, 0.065);
+}
+
+.admin-workbench-shell .admin-editor-song {
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  gap: 11px;
+  padding-bottom: 12px;
+}
+
+.admin-workbench-shell .admin-editor-song > img {
+  width: 78px;
+  height: 78px;
+  border-radius: 10px;
+}
+
+.admin-workbench-shell .admin-editor-song h2 {
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+}
+
+.admin-workbench-shell .admin-match-studio {
+  margin-top: 11px;
+  padding: 11px;
+}
+
+.admin-recommended-pick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 7px;
+  align-items: center;
+  margin-top: 8px;
+  border: 1px solid rgba(109, 233, 240, 0.19);
+  border-radius: 9px;
+  padding: 8px;
+  background: linear-gradient(100deg, rgba(109, 233, 240, 0.075), rgba(255, 255, 255, 0.025));
+}
+
+.admin-recommended-pick.strict {
+  border-color: rgba(255, 225, 125, 0.3);
+  background: linear-gradient(100deg, rgba(255, 225, 125, 0.09), rgba(109, 233, 240, 0.035));
+}
+
+.admin-recommended-pick > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-recommended-pick span {
+  color: var(--gold);
+  font-size: 0.56rem;
+  font-weight: 1000;
+}
+
+.admin-recommended-pick b,
+.admin-recommended-pick small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-recommended-pick b {
+  color: #eef8ff;
+  font-size: 0.72rem;
+}
+
+.admin-recommended-pick small {
+  color: #75869c;
+  font-size: 0.58rem;
+}
+
+.admin-recommended-pick button {
+  width: auto;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 0.6rem;
+}
+
+.admin-workbench-shell .admin-candidate-list {
+  gap: 6px;
+}
+
+.admin-workbench-shell .admin-candidate {
+  grid-template-columns: 20px 82px minmax(0, 1fr);
+  gap: 6px;
+  padding: 7px;
+}
+
+.admin-workbench-shell .admin-candidate > img {
+  width: 82px;
+  height: 47px;
+}
+
+.admin-workbench-shell .admin-candidate-actions {
+  grid-template-columns: auto auto minmax(106px, 1fr);
+}
+
+@media (max-width: 1080px) {
+  .admin-fast-lane {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-fast-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-workbench-shell .admin-overview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .admin-workbench-shell {
+    padding: 14px 12px 34px;
+  }
+
+  .admin-workbench-shell .admin-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-workbench-shell .admin-song-list {
+    max-height: 410px;
+  }
+
+  .admin-workbench-shell .admin-candidate-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-workbench-shell {
+    padding-inline: 9px;
+  }
+
+  .admin-workbench-shell .admin-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-workbench-shell .admin-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-fast-lane ol,
+  .admin-fast-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-workbench-shell .admin-console {
+    position: static;
+  }
+
+  .admin-workbench-shell .admin-toolbar > * {
+    width: 100%;
+  }
+
+  .admin-workbench-shell .admin-queue-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-workbench-shell .admin-queue-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .admin-workbench-shell .admin-queue-controls select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-workbench-shell .admin-editor-panel {
+    padding: 10px;
+  }
+
+  .admin-workbench-shell .admin-editor-song {
+    grid-template-columns: 66px minmax(0, 1fr);
+  }
+
+  .admin-workbench-shell .admin-editor-song > img {
+    width: 66px;
+    height: 66px;
+  }
+
+  .admin-workbench-shell .editor-map-state {
+    grid-column: 1 / -1;
+  }
+
+  .admin-recommended-pick {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-recommended-pick > div {
+    grid-column: 1 / -1;
+  }
+
+  .admin-recommended-pick button {
+    width: 100%;
+  }
+
+  .admin-workbench-shell .admin-candidate-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-workbench-shell .admin-candidate-actions button:last-child {
+    grid-column: 1 / -1;
+  }
+}
