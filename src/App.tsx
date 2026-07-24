@@ -1,5 +1,7 @@
 import {
+  Archive,
   ArrowLeft,
+  BarChart3,
   Camera,
   CheckCircle2,
   Copy,
@@ -7,11 +9,15 @@ import {
   Dices,
   Flag,
   Gauge,
+  Heart,
+  Link,
   Music2,
   RefreshCw,
   RotateCcw,
+  Sparkles,
   Swords,
   Trophy,
+  Volume2,
   Zap
 } from "lucide-react";
 import type { ReactNode, RefObject, SyntheticEvent } from "react";
@@ -24,6 +30,7 @@ import { CupEntry, CupFilters, Difficulty, MatchRecord, Song } from "./types";
 type Phase = "config" | "draw" | "groups" | "revival" | "bracket" | "result";
 type CaptureState = "idle" | "working" | "success" | "error";
 type CopyState = "idle" | "success" | "error";
+type PosterTheme = "sakura" | "neon" | "gold" | "clean";
 
 type BracketSnapshot = {
   roundEntries: CupEntry[];
@@ -32,7 +39,80 @@ type BracketSnapshot = {
   history: MatchRecord[];
 };
 
+type TournamentArchive = {
+  id: string;
+  createdAt: string;
+  modeLabel: string;
+  ruleCode: string;
+  seed: string;
+  championTitle: string;
+  championArtist: string;
+  championJacket: string;
+  runnerUpTitle?: string;
+  topFourTitles: string[];
+};
+
+type TournamentStats = {
+  matchCount: number;
+  categoryLeader: string;
+  versionLeader: string;
+  highestConstant: string;
+  defeatedDesigners: string[];
+  championPathText: string;
+};
+
+type RulePreset = {
+  id: string;
+  title: string;
+  desc: string;
+  filters: Partial<CupFilters>;
+};
+
 const difficulties: Difficulty[] = ["Basic", "Advanced", "Expert", "Master", "Re:Master"];
+const posterThemes: { id: PosterTheme; label: string }[] = [
+  { id: "sakura", label: "樱花赛事" },
+  { id: "neon", label: "霓虹街机" },
+  { id: "gold", label: "黑金冠军" },
+  { id: "clean", label: "简洁分享" }
+];
+const rulePresets: RulePreset[] = [
+  {
+    id: "song-pop",
+    title: "本命歌曲杯",
+    desc: "默认歌曲杯，只按分类和版本抽歌。",
+    filters: { mode: "song", categories: [], versions: [] }
+  },
+  {
+    id: "chart-exp-13",
+    title: "红谱 13 段位",
+    desc: "Expert / Lv 13-13+，适合快速开打。",
+    filters: { mode: "chart", difficulties: ["Expert"], rangeMode: "level", minLevel: "13", maxLevel: "13+" }
+  },
+  {
+    id: "chart-master-14",
+    title: "紫谱神仙杯",
+    desc: "Master / Lv 14-14+，强度直接拉满。",
+    filters: { mode: "chart", difficulties: ["Master"], rangeMode: "level", minLevel: "14", maxLevel: "14+" }
+  },
+  {
+    id: "chart-remaster",
+    title: "白谱特别赛",
+    desc: "Re:Master 全池，只抽白谱。",
+    filters: { mode: "chart", difficulties: ["Re:Master"], rangeMode: "level", minLevel: "1", maxLevel: "15" }
+  },
+  {
+    id: "new-era",
+    title: "新曲版本杯",
+    desc: "PRiSM / CiRCLE 系列优先。",
+    filters: { mode: "song", versions: ["PRiSM", "PRiSM PLUS", "CiRCLE", "CiRCLE PLUS"] }
+  },
+  {
+    id: "classic",
+    title: "怀旧街机杯",
+    desc: "maimai 到 PiNK 时代。",
+    filters: { mode: "song", versions: ["maimai", "maimai PLUS", "GreeN", "GreeN PLUS", "ORANGE", "ORANGE PLUS", "PiNK"] }
+  }
+];
 const fallbackFilters: CupFilters = {
   mode: "song",
   categories: [],
@@ -53,6 +133,14 @@ export default function App() {
   const [filters, setFilters] = useState<CupFilters>(defaultFilters);
   const [seedDraft, setSeedDraft] = useState(defaultSeed);
   const [seedCopyState, setSeedCopyState] = useState<CopyState>("idle");
+  const [autoLinkCopyState, setAutoLinkCopyState] = useState<CopyState>("idle");
+  const [posterTheme, setPosterTheme] = useState<PosterTheme>(() => loadLocalValue("mmc-poster-theme", "sakura") as PosterTheme);
+  const [favoriteSongIds, setFavoriteSongIds] = useState<string[]>(() => loadLocalArray("mmc-favorite-song-ids"));
+  const [excludedSongIds, setExcludedSongIds] = useState<string[]>(() => loadLocalArray("mmc-excluded-song-ids"));
+  const [archives, setArchives] = useState<TournamentArchive[]>(() => loadArchives());
+  const [revivalRevealCount, setRevivalRevealCount] = useState(0);
+  const [duelPreviewingId, setDuelPreviewingId] = useState("");
+  const [duelBlindMode, setDuelBlindMode] = useState(false);
   const [groups, setGroups] = useState<CupEntry[][]>([]);
   const [groupIndex, setGroupIndex] = useState(0);
   const [groupSelection, setGroupSelection] = useState<string[]>([]);
@@ -72,6 +160,9 @@ export default function App() {
   const [catalogUsingImported, setCatalogUsingImported] = useState(false);
   const [catalogError, setCatalogError] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
+  const autoDrawStartedRef = useRef(false);
+  const duelAudioRef = useRef<HTMLAudioElement | null>(null);
+  const archivedChampionRef = useRef("");
 
   function readSeed() {
     return normalizeSeed(seedDraft) || filters.seed;
@@ -124,10 +215,15 @@ export default function App() {
     filters.minLevel,
     filters.maxLevel,
     filters.minConstant,
-    filters.maxConstant
+    filters.maxConstant,
+    excludedSongIds.join("|")
   ].join("::");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const pool = useMemo(() => toCupEntries(songs, filters), [songs, poolSignature]);
+  const rawPool = useMemo(() => toCupEntries(songs, filters), [songs, poolSignature]);
+  const pool = useMemo(
+    () => rawPool.filter((entry) => !excludedSongIds.includes(entry.songId)),
+    [rawPool, excludedSongIds]
+  );
   const uniquePoolEntries = useMemo(() => new Set(pool.map((entry) => entry.id)).size, [pool]);
   const canStart = !catalogLoading && uniquePoolEntries >= 48;
   const modeLabel = cupModeLabel(filters.mode);
@@ -137,7 +233,8 @@ export default function App() {
       : "歌曲本体 · 不区分难度";
   const catalogLabel = catalogLoading ? "曲库加载中" : usingImportedSongs ? "JP 曲库" : "Mock 曲库";
   const activeSeed = phase === "config" ? readSeed() : filters.seed;
-  const cupMeta = `${modeLabel} / ${catalogLabel} / Seed ${activeSeed || "maimai-cup"}`;
+  const ruleCode = makeRuleCode({ ...filters, seed: activeSeed });
+  const cupMeta = `${modeLabel} / ${catalogLabel} / ${ruleCode} / Seed ${activeSeed || "maimai-cup"}`;
   const transitionKey = `${phase}-${roundEntries.length}`;
   const currentGroup = groups[groupIndex] ?? [];
   const currentRoundName = getRoundName(roundEntries.length);
@@ -149,6 +246,77 @@ export default function App() {
     champion
   ].filter(Boolean) as CupEntry[]);
   const championPath = champion ? history.filter((record) => record.winner.id === champion.id) : [];
+  const revivalPicks = useMemo(
+    () => eliminated.filter((entry) => revivalSelection.includes(entry.id)),
+    [eliminated, revivalSelection]
+  );
+  const tournamentStats = useMemo(
+    () => buildTournamentStats([...groups.flat(), ...qualified, ...revivalPicks], history, champion),
+    [groups, qualified, revivalPicks, history, champion]
+  );
+
+  useEffect(() => {
+    saveLocalArray("mmc-favorite-song-ids", favoriteSongIds);
+  }, [favoriteSongIds]);
+
+  useEffect(() => {
+    saveLocalArray("mmc-excluded-song-ids", excludedSongIds);
+  }, [excludedSongIds]);
+
+  useEffect(() => {
+    localStorage.setItem("mmc-poster-theme", posterTheme);
+  }, [posterTheme]);
+
+  useEffect(() => {
+    if (catalogLoading || autoDrawStartedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auto") !== "draw") return;
+    autoDrawStartedRef.current = true;
+    window.setTimeout(() => startDraw(readSeed()), 80);
+  }, [catalogLoading]);
+
+  useEffect(() => {
+    if (phase !== "bracket" || currentMatch.length < 2) return;
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) {
+        return;
+      }
+      if (event.key.toLowerCase() === "a") chooseWinner(currentMatch[0]);
+      if (event.key.toLowerCase() === "d") chooseWinner(currentMatch[1]);
+      if (event.key === "1") playDuelPreview(currentMatch[0]);
+      if (event.key === "2") playDuelPreview(currentMatch[1]);
+      if (event.key === " ") {
+        event.preventDefault();
+        stopDuelPreview();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [phase, currentMatch[0]?.id, currentMatch[1]?.id]);
+
+  useEffect(() => {
+    stopDuelPreview();
+  }, [phase, matchIndex, roundEntries.length]);
+
+  useEffect(() => {
+    if (phase !== "result" || !champion) return;
+    const archiveId = `${filters.seed}-${champion.id}-${history.length}`;
+    if (archivedChampionRef.current === archiveId) return;
+    archivedChampionRef.current = archiveId;
+    const nextArchive: TournamentArchive = {
+      id: archiveId,
+      createdAt: new Date().toISOString(),
+      modeLabel,
+      ruleCode,
+      seed: filters.seed,
+      championTitle: champion.title,
+      championArtist: champion.artist,
+      championJacket: champion.jacket,
+      runnerUpTitle: finalRecord?.loser.title,
+      topFourTitles: topFour.slice(0, 4).map((entry) => entry.title)
+    };
+    setArchives((current) => saveArchives([nextArchive, ...current.filter((item) => item.id !== archiveId)].slice(0, 12)));
+  }, [phase, champion?.id]);
 
   function startDraw(seed = filters.seed) {
     if (catalogLoading) {
@@ -158,7 +326,7 @@ export default function App() {
 
     const nextSeed = normalizeSeed(seed);
     const seededFilters = { ...filters, seed: nextSeed };
-    const entries = toCupEntries(songs, seededFilters);
+    const entries = toCupEntries(songs, seededFilters).filter((entry) => !excludedSongIds.includes(entry.songId));
     const nextGroups = makeGroups(entries, drawSeedFor(seededFilters));
     const drawn = nextGroups.flat();
 
@@ -183,7 +351,30 @@ export default function App() {
     setHistory([]);
     setChampion(null);
     setUndoStack([]);
+    setRevivalRevealCount(0);
     setPhase("draw");
+  }
+
+  function applyPreset(preset: RulePreset) {
+    const nextFilters: CupFilters = {
+      ...filters,
+      ...preset.filters,
+      categories: preset.filters.categories?.filter((category) => categories.includes(category)) ?? filters.categories,
+      versions: preset.filters.versions?.filter((version) => versions.includes(version)) ?? filters.versions,
+      difficulties: preset.filters.difficulties ?? filters.difficulties,
+      seed: randomSeed()
+    };
+    setFilters(nextFilters);
+    setSeedDraft(nextFilters.seed);
+    syncCupUrl(nextFilters);
+  }
+
+  function toggleFavorite(entry: CupEntry) {
+    setFavoriteSongIds((items) => toggleValue(items, entry.songId));
+  }
+
+  function toggleExcluded(entry: CupEntry) {
+    setExcludedSongIds((items) => toggleValue(items, entry.songId));
   }
 
   function startGroups() {
@@ -226,6 +417,7 @@ export default function App() {
   }
 
   function toggleRevivalPick(entry: CupEntry) {
+    setRevivalRevealCount(0);
     setRevivalSelection((selection) => {
       if (selection.includes(entry.id)) {
         return selection.filter((id) => id !== entry.id);
@@ -237,8 +429,21 @@ export default function App() {
     });
   }
 
+  function revealRevivalLineup() {
+    if (revivalSelection.length !== 8) return;
+    setRevivalRevealCount(0);
+    let next = 0;
+    const timer = window.setInterval(() => {
+      next += 1;
+      setRevivalRevealCount(next);
+      if (next >= 8) {
+        window.clearInterval(timer);
+      }
+    }, 220);
+  }
+
   function startBracket() {
-    if (revivalSelection.length !== 8) {
+    if (revivalSelection.length !== 8 || revivalRevealCount < 8) {
       return;
     }
     const revived = eliminated.filter((entry) => revivalSelection.includes(entry.id));
@@ -249,6 +454,32 @@ export default function App() {
     setHistory([]);
     setUndoStack([]);
     setPhase("bracket");
+  }
+
+  function playDuelPreview(entry: CupEntry) {
+    if (!entry.previewAudio) return;
+    stopDuelPreview();
+    const audio = new Audio(entry.previewAudio);
+    duelAudioRef.current = audio;
+    setDuelPreviewingId(entry.id);
+    audio.addEventListener("ended", () => setDuelPreviewingId(""));
+    audio.addEventListener("pause", () => setDuelPreviewingId(""));
+    audio.play().catch(() => setDuelPreviewingId(""));
+  }
+
+  function stopDuelPreview() {
+    const audio = duelAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.src = "";
+    }
+    duelAudioRef.current = null;
+    setDuelPreviewingId("");
+  }
+
+  function playRandomDuelPreview() {
+    if (currentMatch.length < 2) return;
+    playDuelPreview(currentMatch[Math.floor(Math.random() * currentMatch.length)]);
   }
 
   function chooseWinner(winner: CupEntry) {
@@ -328,6 +559,7 @@ export default function App() {
   }
 
   function resetAll() {
+    stopDuelPreview();
     setPhase("config");
     setGroups([]);
     setGroupIndex(0);
@@ -343,6 +575,7 @@ export default function App() {
     setUndoStack([]);
     setDrawError("");
     setCaptureState("idle");
+    setRevivalRevealCount(0);
   }
 
   async function copySeedLink() {
@@ -358,6 +591,21 @@ export default function App() {
       setSeedCopyState("error");
     }
     window.setTimeout(() => setSeedCopyState("idle"), 1800);
+  }
+
+  async function copyAutoDrawLink() {
+    const nextFilters = { ...filters, seed: readSeed() };
+    const url = buildCupUrl(nextFilters, { autoDraw: true });
+    setFilters(nextFilters);
+    setSeedDraft(nextFilters.seed);
+    syncCupUrl(nextFilters);
+    try {
+      await copyText(url);
+      setAutoLinkCopyState("success");
+    } catch {
+      setAutoLinkCopyState("error");
+    }
+    window.setTimeout(() => setAutoLinkCopyState("idle"), 1800);
   }
 
   return (
@@ -418,6 +666,20 @@ export default function App() {
                   : "谱面杯：以「歌 + 单一难度谱面」参赛，整届固定同难度对决。"}
             </p>
             {catalogError ? <p className="filter-hint subtle-hint">真实曲库读取失败，已临时使用 Mock 曲库：{catalogError}</p> : null}
+
+            <div className="rule-code-strip">
+              <span>规则码</span>
+              <b>{ruleCode}</b>
+            </div>
+
+            <FilterBlock title="赛事预设" className="preset-filter">
+              {rulePresets.map((preset) => (
+                <button type="button" className="preset-chip" key={preset.id} onClick={() => applyPreset(preset)}>
+                  <b>{preset.title}</b>
+                  <span>{preset.desc}</span>
+                </button>
+              ))}
+            </FilterBlock>
 
             <FilterBlock title="分类" className="category-filter">
               {categories.map((category) => (
@@ -560,8 +822,6 @@ export default function App() {
               <div className="seed-field">
                 <label htmlFor="cup-seed">默认已随机；填入相同种子可复现同一届抽签</label>
                 <div className="seed-row">
-                  {/* 非受控输入：打字不触发任何 React 重渲染，彻底避免
-                      移动端因重渲染/卡顿而「打不了字」。取值见 readSeed()。 */}
                   <input
                     id="cup-seed"
                     name="cup-seed"
@@ -591,11 +851,15 @@ export default function App() {
                     <Copy size={16} />
                     {seedCopyState === "success" ? "已复制" : "复制链接"}
                   </button>
+                  <button type="button" className="ghost-action" onClick={copyAutoDrawLink}>
+                    <Link size={16} />
+                    {autoLinkCopyState === "success" ? "已复制" : "自动抽签"}
+                  </button>
                 </div>
                 <p className="seed-help">
                   同组复现要同时匹配模式、筛选和曲库；复制链接会把这些全部带上，只靠口头报种子容易跑偏。
                 </p>
-                {seedCopyState === "error" ? <p className="form-error">复制失败，请手动复制地址栏链接。</p> : null}
+                {seedCopyState === "error" || autoLinkCopyState === "error" ? <p className="form-error">复制失败，请手动复制地址栏链接。</p> : null}
               </div>
             </details>
 
@@ -610,8 +874,19 @@ export default function App() {
             {pool.slice(0, 6).map((entry, index) => (
               <div className="stagger-item" style={{ ["--stagger" as string]: `${index * 55}ms` }} key={entry.id}>
                 <SongCard entry={entry} mode="compact" />
+                <EntryToggles
+                  entry={entry}
+                  favorite={favoriteSongIds.includes(entry.songId)}
+                  excluded={excludedSongIds.includes(entry.songId)}
+                  onFavorite={toggleFavorite}
+                  onExclude={toggleExcluded}
+                />
               </div>
             ))}
+            <LibraryPrefs favoriteCount={favoriteSongIds.length} excludedCount={excludedSongIds.length} onClearExcluded={() => setExcludedSongIds([])} />
+            <div className="config-archives">
+              <ArchiveStrip archives={archives} />
+            </div>
           </div>
         </section>
       ) : null}
@@ -704,8 +979,30 @@ export default function App() {
           <div className="selection-status revival-count" role="status">
             <span>复活名额</span>
             <strong>{revivalSelection.length}<small>/8</small></strong>
-            <p>{revivalSelection.length === 8 ? "32 强阵容已就绪" : `还可选择 ${8 - revivalSelection.length} 个谱面或歌曲`}</p>
+            <p>{revivalSelection.length === 8 ? "复活名单待公布" : `还可选择 ${8 - revivalSelection.length} 个谱面或歌曲`}</p>
           </div>
+          {revivalSelection.length === 8 ? (
+            <div className="revival-ceremony">
+              <div className="section-title">
+                <Sparkles size={18} />
+                复活名单
+              </div>
+              <div className="revival-lineup">
+                {revivalPicks.map((entry, index) => (
+                  <div className={`revival-ticket ${index < revivalRevealCount ? "revealed" : ""}`} key={entry.id}>
+                    {index < revivalRevealCount ? (
+                      <>
+                        <img src={entry.jacket} alt="" onError={useFallbackJacket} />
+                        <span>{entry.title}</span>
+                      </>
+                    ) : (
+                      <span>WAITING</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="battle-grid revival">
             {eliminated.map((entry, index) => (
               <div className="stagger-item" style={{ ["--stagger" as string]: `${Math.min(index, 16) * 28}ms` }} key={entry.id}>
@@ -720,10 +1017,17 @@ export default function App() {
             ))}
           </div>
           <div className="sticky-confirm">
-            <button className="primary-action narrow" disabled={revivalSelection.length !== 8} onClick={startBracket}>
-              <Swords size={18} />
-              进入 32 强淘汰赛 · {revivalSelection.length}/8
-            </button>
+            {revivalSelection.length === 8 && revivalRevealCount < 8 ? (
+              <button className="primary-action narrow" onClick={revealRevivalLineup}>
+                <Sparkles size={18} />
+                公布 8 个复活名额
+              </button>
+            ) : (
+              <button className="primary-action narrow" disabled={revivalSelection.length !== 8 || revivalRevealCount < 8} onClick={startBracket}>
+                <Swords size={18} />
+                进入 32 强淘汰赛 · {revivalSelection.length}/8
+              </button>
+            )}
           </div>
         </section>
       ) : null}
@@ -744,8 +1048,26 @@ export default function App() {
           />
           <ProgressBar value={matchIndex} max={roundEntries.length / 2} />
           <RoundRoadmap currentRound={currentRoundName} history={history} />
-          <div className="duel-prompt" role="status">点击一侧卡片，送它晋级下一轮</div>
-          <div className="duel-zone">
+          <div className="duel-prompt" role="status">点击一侧卡片，送它晋级下一轮。键盘：A 左 / D 右 / 1-2 试听 / 空格停止。</div>
+          <div className="duel-toolbar">
+            {currentMatch.map((entry, index) => (
+              <button type="button" className="ghost-action" key={entry.id} disabled={!entry.previewAudio} onClick={() => playDuelPreview(entry)}>
+                <Volume2 size={16} />
+                {duelPreviewingId === entry.id ? "试听中" : `试听${index === 0 ? "左侧" : "右侧"}`}
+              </button>
+            ))}
+            <button type="button" className="ghost-action" onClick={stopDuelPreview} disabled={!duelPreviewingId}>
+              暂停试听
+            </button>
+            <button type="button" className="ghost-action" onClick={playRandomDuelPreview}>
+              <Dices size={16} />
+              随机试听
+            </button>
+            <button type="button" className={`ghost-action ${duelBlindMode ? "active-soft" : ""}`} onClick={() => setDuelBlindMode((value) => !value)}>
+              纠结盲选
+            </button>
+          </div>
+          <div className={`duel-zone ${duelBlindMode ? "is-blind" : ""}`}>
             {currentMatch.map((entry, index) => (
               <div className={`duel-slot side-${index + 1}`} key={entry.id}>
                 <SongCard entry={entry} mode="duel" onSelect={chooseWinner} />
@@ -759,6 +1081,7 @@ export default function App() {
 
       {phase === "result" && champion ? (
         <section className="stage phase-panel result-stage">
+          <PosterThemePicker value={posterTheme} onChange={setPosterTheme} />
           <SharePoster
             captureRef={resultRef}
             champion={champion}
@@ -768,7 +1091,11 @@ export default function App() {
             history={history}
             modeLabel={modeLabel}
             seed={filters.seed}
+            ruleCode={ruleCode}
+            theme={posterTheme}
           />
+          <ResultStatsPanel stats={tournamentStats} />
+          <ArchiveStrip archives={archives} />
           <div className="result-actions">
             <button className="primary-inline" onClick={downloadShareImage} disabled={captureState === "working"}>
               <Camera size={17} />
@@ -887,7 +1214,9 @@ function SharePoster({
   championPath,
   history,
   modeLabel,
-  seed
+  seed,
+  ruleCode,
+  theme
 }: {
   captureRef: RefObject<HTMLDivElement>;
   champion: CupEntry;
@@ -897,15 +1226,18 @@ function SharePoster({
   history: MatchRecord[];
   modeLabel: string;
   seed: string;
+  ruleCode: string;
+  theme: PosterTheme;
 }) {
   return (
-    <div className="share-poster" ref={captureRef}>
+    <div className={`share-poster poster-theme-${theme}`} ref={captureRef}>
       <div className="poster-header">
         <div className="poster-kicker"><span>OFFICIAL RESULT</span><b>48 → 1</b></div>
         <p>MAIMAI CUP</p>
         <h2>{modeLabel} · 舞萌本命之巅</h2>
         <div className="poster-meta-line">
           <span className="poster-seed">SEED · {seed || "maimai-cup"}</span>
+          <span>{ruleCode}</span>
           <span>32 强完整晋级表</span>
         </div>
       </div>
@@ -1025,6 +1357,120 @@ function FilterBlock({ title, className = "", children }: { title: string; class
   );
 }
 
+function EntryToggles({
+  entry,
+  favorite,
+  excluded,
+  onFavorite,
+  onExclude
+}: {
+  entry: CupEntry;
+  favorite: boolean;
+  excluded: boolean;
+  onFavorite: (entry: CupEntry) => void;
+  onExclude: (entry: CupEntry) => void;
+}) {
+  return (
+    <div className="entry-toggles">
+      <button type="button" className={favorite ? "active" : ""} onClick={() => onFavorite(entry)}>
+        <Heart size={14} />
+        {favorite ? "已收藏" : "收藏"}
+      </button>
+      <button type="button" className={excluded ? "danger active" : "danger"} onClick={() => onExclude(entry)}>
+        {excluded ? "已排除" : "排除"}
+      </button>
+    </div>
+  );
+}
+
+function LibraryPrefs({ favoriteCount, excludedCount, onClearExcluded }: { favoriteCount: number; excludedCount: number; onClearExcluded: () => void }) {
+  return (
+    <div className="library-prefs">
+      <span><Heart size={14} /> 收藏 {favoriteCount}</span>
+      <span>排除 {excludedCount}</span>
+      {excludedCount ? <button type="button" onClick={onClearExcluded}>清空排除</button> : null}
+    </div>
+  );
+}
+
+function PosterThemePicker({ value, onChange }: { value: PosterTheme; onChange: (theme: PosterTheme) => void }) {
+  return (
+    <div className="poster-theme-picker">
+      <div className="section-title">
+        <Camera size={18} />
+        海报模板
+      </div>
+      <div className="theme-row">
+        {posterThemes.map((theme) => (
+          <button type="button" className={theme.id === value ? "active" : ""} key={theme.id} onClick={() => onChange(theme.id)}>
+            {theme.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ResultStatsPanel({ stats }: { stats: TournamentStats }) {
+  return (
+    <section className="result-stats">
+      <div className="section-title">
+        <BarChart3 size={18} />
+        赛后统计
+      </div>
+      <div className="stats-grid">
+        <StatTile label="完成对局" value={`${stats.matchCount} 场`} />
+        <StatTile label="版本势力" value={stats.versionLeader} />
+        <StatTile label="分类势力" value={stats.categoryLeader} />
+        <StatTile label="最高定数" value={stats.highestConstant} />
+      </div>
+      <div className="stats-notes">
+        <span>冠军路径</span>
+        <b>{stats.championPathText}</b>
+      </div>
+      {stats.defeatedDesigners.length ? (
+        <div className="stats-notes">
+          <span>击败谱师</span>
+          <b>{stats.defeatedDesigners.join(" / ")}</b>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stat-tile">
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
+function ArchiveStrip({ archives }: { archives: TournamentArchive[] }) {
+  if (!archives.length) return null;
+  return (
+    <section className="archive-strip">
+      <div className="section-title">
+        <Archive size={18} />
+        最近赛事
+      </div>
+      <div className="archive-row">
+        {archives.slice(0, 6).map((item) => (
+          <article className="archive-card" key={item.id}>
+            <img src={item.championJacket} alt="" onError={useFallbackJacket} />
+            <div>
+              <span>{item.modeLabel} · {item.ruleCode}</span>
+              <b>{item.championTitle}</b>
+              <small>{formatArchiveTime(item.createdAt)} / Seed {item.seed}</small>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" className={`chip ${active ? "active" : ""}`} onClick={onClick}>
@@ -1072,6 +1518,96 @@ function uniqueEntries(items: CupEntry[]) {
   return items.filter((item, index, array) => array.findIndex((candidate) => candidate.id === item.id) === index);
 }
 
+function buildTournamentStats(entries: CupEntry[], history: MatchRecord[], champion: CupEntry | null): TournamentStats {
+  const uniqueEntryList = uniqueEntries(entries);
+  const categoryLeader = topCountLabel(uniqueEntryList.map((entry) => entry.category));
+  const versionLeader = topCountLabel(uniqueEntryList.map((entry) => entry.version));
+  const constants = uniqueEntryList
+    .map((entry) => entry.chart?.constant)
+    .filter(isNumber);
+  const championPath = champion ? history.filter((record) => record.winner.id === champion.id) : [];
+  const defeatedDesigners = unique(
+    championPath
+      .map((record) => record.loser.chart?.designer?.trim())
+      .filter((designer): designer is string => typeof designer === "string" && designer.length > 0 && !["-", "maimaiNET"].includes(designer))
+  ).slice(0, 6);
+
+  return {
+    matchCount: history.length,
+    categoryLeader,
+    versionLeader,
+    highestConstant: constants.length ? constants.reduce((max, value) => Math.max(max, value), 0).toFixed(1) : "无",
+    defeatedDesigners,
+    championPathText: championPath.length
+      ? championPath.map((record) => `${record.round}胜 ${record.loser.title}`).join(" / ")
+      : "暂无"
+  };
+}
+
+function topCountLabel(values: string[]) {
+  if (!values.length) return "暂无";
+  const counts = new Map<string, number>();
+  values.forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+  const [name, count] = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return `${name} · ${count}`;
+}
+
+function makeRuleCode(filters: CupFilters) {
+  return `规则码 ${shortHash(drawSeedFor(filters))}`;
+}
+
+function shortHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).toUpperCase().padStart(6, "0").slice(0, 6);
+}
+
+function loadLocalArray(key: string) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalArray(key: string, value: string[]) {
+  localStorage.setItem(key, JSON.stringify(unique(value).slice(0, 500)));
+}
+
+function loadLocalValue(key: string, fallback: string) {
+  try {
+    return localStorage.getItem(key) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function loadArchives() {
+  try {
+    const value = JSON.parse(localStorage.getItem("mmc-tournament-archives") || "[]");
+    return Array.isArray(value) ? (value as TournamentArchive[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveArchives(value: TournamentArchive[]) {
+  localStorage.setItem("mmc-tournament-archives", JSON.stringify(value));
+  return value;
+}
+
+function formatArchiveTime(value: string) {
+  try {
+    return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
 function normalizeLevelRange(filters: CupFilters) {
   if (compareLevel(filters.minLevel, filters.maxLevel) <= 0) {
     return filters;
@@ -1117,12 +1653,15 @@ function createDefaultFilters(): CupFilters {
   };
 }
 
-function buildCupUrl(filters: CupFilters) {
+function buildCupUrl(filters: CupFilters, options: { autoDraw?: boolean } = {}) {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("mode", filters.mode);
   url.searchParams.set("seed", normalizeSeed(filters.seed));
+  if (options.autoDraw) {
+    url.searchParams.set("auto", "draw");
+  }
   filters.categories.forEach((category) => url.searchParams.append("category", category));
   filters.versions.forEach((version) => url.searchParams.append("version", version));
 

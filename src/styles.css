@@ -3158,6 +3158,306 @@ button:not(:disabled):hover,
   letter-spacing: 0.12em;
 }
 
+.rule-code-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 16px;
+  border: 1px solid rgba(255, 212, 121, 0.28);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, rgba(255, 212, 121, 0.12), rgba(255, 158, 199, 0.08));
+}
+
+.rule-code-strip span,
+.stats-notes span,
+.archive-card span,
+.stat-tile span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.rule-code-strip b {
+  color: var(--gold);
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+}
+
+.preset-filter .chip-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preset-chip {
+  min-height: 74px;
+  border: 1px solid rgba(255, 158, 199, 0.18);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.preset-chip b,
+.preset-chip span {
+  display: block;
+}
+
+.preset-chip b {
+  margin-bottom: 4px;
+  color: #fff;
+  font-size: 0.88rem;
+}
+
+.preset-chip span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.entry-toggles,
+.library-prefs,
+.duel-toolbar,
+.theme-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.entry-toggles {
+  margin-top: 8px;
+}
+
+.entry-toggles button,
+.library-prefs button,
+.theme-row button {
+  border: 1px solid rgba(255, 158, 199, 0.18);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.entry-toggles button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.entry-toggles button.active,
+.theme-row button.active,
+.ghost-action.active-soft {
+  border-color: rgba(255, 212, 121, 0.55);
+  color: #231307;
+  background: linear-gradient(135deg, #fff1a6, #ff9ec7);
+}
+
+.entry-toggles button.danger.active {
+  border-color: rgba(255, 93, 115, 0.65);
+  color: #fff;
+  background: rgba(255, 93, 115, 0.28);
+}
+
+.library-prefs {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.config-archives {
+  grid-column: 1 / -1;
+}
+
+.library-prefs span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.duel-toolbar {
+  justify-content: center;
+  margin: 12px 0 18px;
+}
+
+.duel-zone.is-blind .song-meta,
+.duel-zone.is-blind .tag-row,
+.duel-zone.is-blind .chart-panel,
+.duel-zone.is-blind .song-stats {
+  filter: blur(7px);
+  opacity: 0.42;
+  pointer-events: none;
+  user-select: none;
+}
+
+.revival-ceremony {
+  margin: 16px 0;
+  border: 1px solid rgba(255, 212, 121, 0.22);
+  border-radius: 12px;
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(255, 212, 121, 0.08), rgba(255, 93, 143, 0.08));
+}
+
+.revival-lineup {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.revival-ticket {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px dashed rgba(255, 212, 121, 0.25);
+  border-radius: 8px;
+  padding: 8px;
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.revival-ticket.revealed {
+  border-style: solid;
+  border-color: rgba(255, 212, 121, 0.52);
+  color: #fff;
+  animation: chip-pop 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.revival-ticket img,
+.archive-card img {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.poster-theme-picker,
+.result-stats,
+.archive-strip {
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat-tile {
+  border: 1px solid rgba(255, 158, 199, 0.14);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.stat-tile b {
+  display: block;
+  margin-top: 6px;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.stats-notes {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.stats-notes b {
+  color: #fff;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.archive-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.archive-card {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(255, 158, 199, 0.14);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.archive-card div {
+  min-width: 0;
+}
+
+.archive-card b,
+.archive-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-card b {
+  color: #fff;
+  font-size: 0.88rem;
+}
+
+.archive-card small {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.poster-theme-neon {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(0, 255, 220, 0.16), transparent 32%),
+    linear-gradient(135deg, #07151b, #1b0730 56%, #07070f);
+}
+
+.poster-theme-gold {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 212, 121, 0.2), transparent 34%),
+    linear-gradient(135deg, #0d0a06, #201408 58%, #080605);
+}
+
+.poster-theme-clean {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(135deg, #140c13, #18121b);
+  background-size: 36px 36px, 36px 36px, cover;
+}
+
+@media (max-width: 760px) {
+  .preset-filter .chip-row,
+  .revival-lineup,
+  .stats-grid,
+  .archive-row {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-notes {
+    grid-template-columns: 1fr;
+  }
+}
+
 .asset-admin-shell {
   width: min(1540px, calc(100vw - 32px));
   padding: 32px 0 56px;
