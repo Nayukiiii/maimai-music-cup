@@ -6,7 +6,10 @@ const root = process.cwd();
 const requireAssets = process.argv.includes("--require-assets");
 const privateAssetRoot = path.resolve(process.env.MMC_PRIVATE_ASSET_ROOT || path.join(root, "deploy/private-assets"));
 const assetRoots = [path.join(root, "public"), privateAssetRoot];
-const songsPath = path.join(root, "src/data/importedSongs.json");
+const songsPath = firstExisting([
+  path.join(root, "public/data/importedSongs.json"),
+  path.join(root, "src/data/importedSongs.json")
+]);
 const youtubePath = path.join(root, "src/data/youtubeSources.json");
 const songs = JSON.parse(fs.readFileSync(songsPath, "utf8"));
 const youtubeSources = JSON.parse(fs.readFileSync(youtubePath, "utf8"));
@@ -117,4 +120,10 @@ function assetExists(webPath) {
   if (/^https?:\/\//i.test(webPath)) return true;
   const relative = webPath.replace(/^\/+/, "");
   return assetRoots.some((assetRoot) => fs.existsSync(path.join(assetRoot, relative)));
+}
+
+function firstExisting(paths) {
+  const found = paths.find((candidate) => fs.existsSync(candidate));
+  if (!found) return paths[0];
+  return found;
 }

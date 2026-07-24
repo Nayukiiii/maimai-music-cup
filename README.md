@@ -49,7 +49,7 @@ npm run build
 当前正式曲库集中在：
 
 ```text
-src/data/importedSongs.json
+public/data/importedSongs.json
 ```
 
 `src/data/mockSongs.ts` 只在正式曲库为空时作为开发兜底。替换曲库时保持 `Song` 字段结构：
@@ -258,7 +258,7 @@ docker compose run --rm cn-song-importer
 docker compose up -d --build
 ```
 
-脚本会读取公开的 `maidata.json`，转换成 `src/data/importedSongs.json`，并把封面缓存到 `public/assets/jackets/cn-db/`。如果不想缓存封面、只用远程 URL：
+脚本会读取公开的 `maidata.json`，转换成 `public/data/importedSongs.json`，并把封面缓存到 `public/assets/jackets/cn-db/`。如果不想缓存封面、只用远程 URL：
 
 ```bash
 docker compose run --rm cn-song-importer node scripts/import-cn-songs.mjs
@@ -405,11 +405,12 @@ server {
 
 ```text
 maimai-music-cup/
+  public/
+    data/importedSongs.json
   src/
     admin/AdminApp.tsx
     admin/YouTubeAdmin.tsx
     components/SongCard.tsx
-    data/importedSongs.json
     data/youtubeSources.json
     data/mockSongs.ts
     lib/tournament.ts

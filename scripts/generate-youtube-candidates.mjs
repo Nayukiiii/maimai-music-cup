@@ -3,7 +3,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const options = parseArgs(process.argv.slice(2));
-const songs = readJson(resolve("src/data/importedSongs.json"));
+const songs = readJson(firstExisting(["public/data/importedSongs.json", "src/data/importedSongs.json"].map((item) => resolve(item))));
 const shippedSources = readJson(resolve("src/data/youtubeSources.json"));
 const outputPath = resolve(options.output);
 const bundle = loadBundle(outputPath);
@@ -170,6 +170,12 @@ function writeCheckpoint(path, value) {
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function firstExisting(paths) {
+  const found = paths.find((path) => existsSync(path));
+  if (!found) return paths[0];
+  return found;
 }
 
 function pickThumbnail(thumbnails, videoId) {

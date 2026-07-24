@@ -16,9 +16,9 @@ import {
 import type { ReactNode, RefObject, SyntheticEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SongCard } from "./components/SongCard";
-import { songs, usingImportedSongs } from "./data/songs";
+import { loadSongCatalog } from "./data/songs";
 import { compareLevel, getRoundName, makeGroups, shuffleWithSeed, toCupEntries } from "./lib/tournament";
-import { CupEntry, CupFilters, Difficulty, MatchRecord } from "./types";
+import { CupEntry, CupFilters, Difficulty, MatchRecord, Song } from "./types";
 
 type Phase = "config" | "draw" | "groups" | "revival" | "bracket" | "result";
 type CaptureState = "idle" | "working" | "success" | "error";
@@ -61,18 +61,44 @@ export default function App() {
   const [undoStack, setUndoStack] = useState<BracketSnapshot[]>([]);
   const [drawError, setDrawError] = useState("");
   const [captureState, setCaptureState] = useState<CaptureState>("idle");
+  const [catalogSongs, setCatalogSongs] = useState<Song[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogUsingImported, setCatalogUsingImported] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
+  const seedInputRef = useRef<HTMLInputElement>(null);
 
-  const categories = useMemo(() => unique(songs.map((song) => song.category)), []);
-  const versions = useMemo(() => unique(songs.map((song) => song.version)), []);
+  // 种子输入框是非受控的，开抽时以输入框实际内容为准
+  function readSeed() {
+    return seedInputRef.current?.value.trim() || filters.seed;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    loadSongCatalog().then((catalog) => {
+      if (cancelled) return;
+      setCatalogSongs(catalog.songs);
+      setCatalogUsingImported(catalog.usingImportedSongs);
+      setCatalogError(catalog.error || "");
+      setCatalogLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const songs = catalogSongs;
+  const usingImportedSongs = catalogUsingImported;
+  const categories = useMemo(() => unique(songs.map((song) => song.category)), [songs]);
+  const versions = useMemo(() => unique(songs.map((song) => song.version)), [songs]);
   const levelOptions = useMemo(
     () => unique(songs.flatMap((song) => song.charts.map((chart) => chart.level))).sort(compareLevel),
-    []
+    [songs]
   );
   const constantBounds = useMemo(() => {
     const values = songs.flatMap((song) => song.charts.map((chart) => chart.constant)).filter(isNumber);
     return values.length ? { min: Math.min(...values), max: Math.max(...values) } : null;
-  }, []);
+  }, [songs]);
   useEffect(() => {
     if (!levelOptions.length) return;
     const first = levelOptions[0];
@@ -83,15 +109,30 @@ export default function App() {
         : { ...current, minLevel: first, maxLevel: last }
     );
   }, [levelOptions]);
-  const pool = useMemo(() => toCupEntries(songs, filters), [filters]);
+  // 种子不参与筛选，必须排除在依赖之外：否则每敲一个字符都会把
+  // 1587 首歌 / 6000+ 张谱重新过一遍，低端手机上会卡到打不出字。
+  const poolSignature = [
+    filters.mode,
+    filters.categories.join("|"),
+    filters.versions.join("|"),
+    filters.difficulties.join("|"),
+    filters.rangeMode,
+    filters.minLevel,
+    filters.maxLevel,
+    filters.minConstant,
+    filters.maxConstant
+  ].join("::");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pool = useMemo(() => toCupEntries(songs, filters), [songs, poolSignature]);
   const uniquePoolEntries = useMemo(() => new Set(pool.map((entry) => entry.id)).size, [pool]);
-  const canStart = uniquePoolEntries >= 48;
+  const canStart = !catalogLoading && uniquePoolEntries >= 48;
   const modeLabel = cupModeLabel(filters.mode);
   const difficultyModeText =
     filters.mode === "chart"
       ? `${filters.difficulties[0] ?? "Expert"} / ${filters.rangeMode === "level" ? `Lv ${filters.minLevel}–${filters.maxLevel}` : `定数 ${filters.minConstant.toFixed(1)}–${filters.maxConstant.toFixed(1)}`}`
       : "歌曲本体 · 不区分难度";
-  const cupMeta = `${modeLabel} / ${usingImportedSongs ? "JP 曲库" : "Mock 曲库"} / Seed ${filters.seed || "maimai-cup"}`;
+  const catalogLabel = catalogLoading ? "曲库加载中" : usingImportedSongs ? "JP 曲库" : "Mock 曲库";
+  const cupMeta = `${modeLabel} / ${catalogLabel} / Seed ${filters.seed || "maimai-cup"}`;
   const transitionKey = `${phase}-${roundEntries.length}`;
   const currentGroup = groups[groupIndex] ?? [];
   const currentRoundName = getRoundName(roundEntries.length);
@@ -105,6 +146,11 @@ export default function App() {
   const championPath = champion ? history.filter((record) => record.winner.id === champion.id) : [];
 
   function startDraw(seed = filters.seed) {
+    if (catalogLoading) {
+      setDrawError("曲库还在加载，请稍等一下再开赛。");
+      return;
+    }
+
     const seededFilters = { ...filters, seed };
     const entries = toCupEntries(songs, seededFilters);
     const nextGroups = makeGroups(entries, seed);
@@ -299,7 +345,7 @@ export default function App() {
           <h1>舞萌本命之巅</h1>
           <div className="cup-context">
             <span>{modeLabel}</span>
-            <span>{usingImportedSongs ? "JP 曲库" : "Mock 曲库"}</span>
+            <span>{catalogLabel}</span>
             <span>{difficultyModeText}</span>
           </div>
         </div>
@@ -342,10 +388,13 @@ export default function App() {
             </div>
 
             <p className="filter-hint mode-desc">
-              {filters.mode === "song"
-                ? "歌曲杯：以「一首歌」为参赛单位，不区分谱面难度。"
-                : "谱面杯：以「歌 + 单一难度谱面」参赛，整届固定同难度对决。"}
+              {catalogLoading
+                ? "曲库加载中，配置项会在数据到达后自动展开。"
+                : filters.mode === "song"
+                  ? "歌曲杯：以「一首歌」为参赛单位，不区分谱面难度。"
+                  : "谱面杯：以「歌 + 单一难度谱面」参赛，整届固定同难度对决。"}
             </p>
+            {catalogError ? <p className="filter-hint subtle-hint">真实曲库读取失败，已临时使用 Mock 曲库：{catalogError}</p> : null}
 
             <FilterBlock title="分类" className="category-filter">
               {categories.map((category) => (
@@ -488,19 +537,31 @@ export default function App() {
               <div className="seed-field">
                 <label htmlFor="cup-seed">默认已随机；填入相同种子可复现同一届抽签</label>
                 <div className="seed-row">
+                  {/* 非受控输入：打字不触发任何 React 重渲染，彻底避免
+                      移动端因重渲染/卡顿而「打不了字」。取值见 readSeed()。 */}
                   <input
                     id="cup-seed"
                     name="cup-seed"
                     type="text"
+                    ref={seedInputRef}
+                    defaultValue={filters.seed}
                     autoComplete="off"
                     autoCapitalize="off"
                     autoCorrect="off"
                     spellCheck={false}
-                    value={filters.seed}
-                    onChange={(event) => setFilters({ ...filters, seed: event.target.value })}
                     placeholder="例如 maimai-cup"
                   />
-                  <button type="button" className="ghost-action" onClick={() => setFilters({ ...filters, seed: randomSeed() })}>
+                  <button
+                    type="button"
+                    className="ghost-action"
+                    onClick={() => {
+                      const next = randomSeed();
+                      if (seedInputRef.current) {
+                        seedInputRef.current.value = next;
+                      }
+                      setFilters((current) => ({ ...current, seed: next }));
+                    }}
+                  >
                     <Dices size={16} />
                     随机
                   </button>
@@ -508,9 +569,9 @@ export default function App() {
               </div>
             </details>
 
-            <button className="primary-action" onClick={() => startDraw()} disabled={!canStart}>
+            <button className="primary-action" onClick={() => startDraw(readSeed())} disabled={!canStart}>
               <Dices size={20} />
-              开始抽签 48 强
+              {catalogLoading ? "曲库加载中…" : "开始抽签 48 强"}
             </button>
             {drawError ? <p className="form-error" role="alert">{drawError}</p> : null}
           </div>

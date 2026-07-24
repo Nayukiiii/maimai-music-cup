@@ -233,7 +233,7 @@ function AssetReviewAdmin() {
         <section className="asset-empty-state">
           <AlertCircle size={28} />
           <h1>曲库为空</h1>
-          <p>请先生成并放入 src/data/importedSongs.json。</p>
+          <p>请先生成并放入 public/data/importedSongs.json。</p>
         </section>
       </main>
     );

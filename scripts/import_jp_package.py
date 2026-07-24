@@ -78,7 +78,7 @@ VERSION_DISPLAY_ALIASES = {
 def main() -> int:
     parser = argparse.ArgumentParser(description="Import JP package Music.xml data for maimai-music-cup.")
     parser.add_argument("package_root", help="Game package folder, e.g. D:\\gal\\SDEZ1.66\\Package")
-    parser.add_argument("--out-json", default="src/data/importedSongs.json")
+    parser.add_argument("--out-json", default="public/data/importedSongs.json")
     parser.add_argument("--manifest", default="jp_assets_manifest.csv")
     parser.add_argument("--tasks", default="jp_asset_tasks.json")
     parser.add_argument("--jacket-web-dir", default="/assets/jackets/jp-db")

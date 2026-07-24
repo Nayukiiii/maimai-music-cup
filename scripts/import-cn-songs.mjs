@@ -12,7 +12,7 @@ const args = new Set(process.argv.slice(2));
 const downloadCovers = args.has("--download-covers");
 const useGithubCovers = args.has("--github-covers");
 const root = process.cwd();
-const outputPath = join(root, "src", "data", "importedSongs.json");
+const outputPath = join(root, "public", "data", "importedSongs.json");
 const coverDir = join(root, "public", "assets", "jackets", "cn-db");
 
 const sourceData = await fetchJson(DATA_URL);
