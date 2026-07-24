@@ -31,6 +31,7 @@ export function toCupEntries(songs: Song[], filters: CupFilters): CupEntry[] {
           category: song.category,
           version: song.version,
           jacket: song.jacket,
+          jacketThumb: song.jacketThumb,
           previewAudio: song.previewAudio,
           bpm: song.bpm
         }
@@ -60,6 +61,7 @@ export function toCupEntries(songs: Song[], filters: CupFilters): CupEntry[] {
         category: song.category,
         version: song.version,
         jacket: song.jacket,
+        jacketThumb: song.jacketThumb,
         previewAudio: song.previewAudio,
         bpm: song.bpm,
         chart

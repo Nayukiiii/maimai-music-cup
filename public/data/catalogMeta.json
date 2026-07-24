@@ -1,0 +1,599 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-24T08:17:57.594Z",
+  "songCount": 1587,
+  "chartCount": 6253,
+  "categories": [
+    {
+      "name": "maimai",
+      "count": 418
+    },
+    {
+      "name": "niconicoボーカロイド",
+      "count": 395
+    },
+    {
+      "name": "ゲームバラエティ",
+      "count": 263
+    },
+    {
+      "name": "東方Project",
+      "count": 163
+    },
+    {
+      "name": "オンゲキCHUNITHM",
+      "count": 148
+    },
+    {
+      "name": "POPSアニメ",
+      "count": 119
+    },
+    {
+      "name": "宴会場",
+      "count": 81
+    }
+  ],
+  "versions": [
+    {
+      "name": "PRiSM PLUS",
+      "count": 98
+    },
+    {
+      "name": "BUDDiES",
+      "count": 93
+    },
+    {
+      "name": "CiRCLE",
+      "count": 89
+    },
+    {
+      "name": "BUDDiES PLUS",
+      "count": 84
+    },
+    {
+      "name": "PRiSM",
+      "count": 83
+    },
+    {
+      "name": "maimai DX",
+      "count": 78
+    },
+    {
+      "name": "FESTiVAL",
+      "count": 76
+    },
+    {
+      "name": "FESTiVAL PLUS",
+      "count": 73
+    },
+    {
+      "name": "UNiVERSE",
+      "count": 67
+    },
+    {
+      "name": "UNiVERSE PLUS",
+      "count": 66
+    },
+    {
+      "name": "Splash PLUS",
+      "count": 65
+    },
+    {
+      "name": "Splash",
+      "count": 61
+    },
+    {
+      "name": "GreeN",
+      "count": 58
+    },
+    {
+      "name": "maimai DX PLUS",
+      "count": 57
+    },
+    {
+      "name": "FiNALE",
+      "count": 56
+    },
+    {
+      "name": "GreeN PLUS",
+      "count": 53
+    },
+    {
+      "name": "MiLK",
+      "count": 50
+    },
+    {
+      "name": "MURASAKi",
+      "count": 47
+    },
+    {
+      "name": "maimai PLUS",
+      "count": 46
+    },
+    {
+      "name": "MiLK PLUS",
+      "count": 45
+    },
+    {
+      "name": "maimai",
+      "count": 43
+    },
+    {
+      "name": "MURASAKi PLUS",
+      "count": 42
+    },
+    {
+      "name": "PiNK",
+      "count": 36
+    },
+    {
+      "name": "PiNK PLUS",
+      "count": 35
+    },
+    {
+      "name": "ORANGE PLUS",
+      "count": 32
+    },
+    {
+      "name": "ORANGE",
+      "count": 30
+    },
+    {
+      "name": "CiRCLE PLUS",
+      "count": 24
+    }
+  ],
+  "levels": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "5+",
+    "6",
+    "6+",
+    "7",
+    "7+",
+    "8",
+    "8+",
+    "9",
+    "9+",
+    "10",
+    "10+",
+    "11",
+    "11+",
+    "12",
+    "12+",
+    "13",
+    "13+",
+    "14",
+    "14+",
+    "15"
+  ],
+  "constantBounds": {
+    "min": 1,
+    "max": 15
+  },
+  "difficulties": {
+    "Basic": {
+      "chartCount": 1587,
+      "songCount": 1587,
+      "levels": [
+        {
+          "name": "4",
+          "count": 395
+        },
+        {
+          "name": "5",
+          "count": 371
+        },
+        {
+          "name": "3",
+          "count": 333
+        },
+        {
+          "name": "6",
+          "count": 218
+        },
+        {
+          "name": "2",
+          "count": 130
+        },
+        {
+          "name": "7",
+          "count": 40
+        },
+        {
+          "name": "13",
+          "count": 26
+        },
+        {
+          "name": "1",
+          "count": 14
+        },
+        {
+          "name": "13+",
+          "count": 14
+        },
+        {
+          "name": "14",
+          "count": 13
+        },
+        {
+          "name": "12+",
+          "count": 10
+        },
+        {
+          "name": "14+",
+          "count": 8
+        },
+        {
+          "name": "12",
+          "count": 6
+        },
+        {
+          "name": "7+",
+          "count": 5
+        },
+        {
+          "name": "11",
+          "count": 3
+        },
+        {
+          "name": "11+",
+          "count": 1
+        }
+      ],
+      "designers": [
+        {
+          "name": "-",
+          "count": 1587
+        }
+      ]
+    },
+    "Advanced": {
+      "chartCount": 1506,
+      "songCount": 1506,
+      "levels": [
+        {
+          "name": "7",
+          "count": 401
+        },
+        {
+          "name": "8",
+          "count": 355
+        },
+        {
+          "name": "7+",
+          "count": 303
+        },
+        {
+          "name": "6",
+          "count": 210
+        },
+        {
+          "name": "8+",
+          "count": 81
+        },
+        {
+          "name": "9",
+          "count": 67
+        },
+        {
+          "name": "6+",
+          "count": 66
+        },
+        {
+          "name": "9+",
+          "count": 8
+        },
+        {
+          "name": "10",
+          "count": 6
+        },
+        {
+          "name": "5+",
+          "count": 5
+        },
+        {
+          "name": "11",
+          "count": 2
+        },
+        {
+          "name": "10+",
+          "count": 1
+        },
+        {
+          "name": "5",
+          "count": 1
+        }
+      ],
+      "designers": [
+        {
+          "name": "-",
+          "count": 1506
+        }
+      ]
+    },
+    "Expert": {
+      "chartCount": 1506,
+      "songCount": 1506,
+      "levels": [
+        {
+          "name": "10+",
+          "count": 239
+        },
+        {
+          "name": "10",
+          "count": 238
+        },
+        {
+          "name": "11",
+          "count": 225
+        },
+        {
+          "name": "9+",
+          "count": 178
+        },
+        {
+          "name": "11+",
+          "count": 150
+        },
+        {
+          "name": "12",
+          "count": 148
+        },
+        {
+          "name": "12+",
+          "count": 117
+        },
+        {
+          "name": "9",
+          "count": 108
+        },
+        {
+          "name": "13",
+          "count": 56
+        },
+        {
+          "name": "8+",
+          "count": 29
+        },
+        {
+          "name": "8",
+          "count": 13
+        },
+        {
+          "name": "13+",
+          "count": 5
+        }
+      ],
+      "designers": [
+        {
+          "name": "はっぴー",
+          "count": 276
+        },
+        {
+          "name": "サファ太",
+          "count": 199
+        },
+        {
+          "name": "Jack",
+          "count": 153
+        },
+        {
+          "name": "鳩ホルダー",
+          "count": 70
+        },
+        {
+          "name": "Luxizhel",
+          "count": 69
+        },
+        {
+          "name": "某S氏",
+          "count": 66
+        },
+        {
+          "name": "翠楼屋",
+          "count": 66
+        },
+        {
+          "name": "譜面-100号",
+          "count": 61
+        },
+        {
+          "name": "mai-Star",
+          "count": 54
+        },
+        {
+          "name": "小鳥遊さん",
+          "count": 49
+        },
+        {
+          "name": "ロシェ@ペンギン",
+          "count": 45
+        },
+        {
+          "name": "隅田川星人",
+          "count": 42
+        }
+      ]
+    },
+    "Master": {
+      "chartCount": 1506,
+      "songCount": 1506,
+      "levels": [
+        {
+          "name": "13",
+          "count": 482
+        },
+        {
+          "name": "13+",
+          "count": 323
+        },
+        {
+          "name": "14",
+          "count": 222
+        },
+        {
+          "name": "12+",
+          "count": 208
+        },
+        {
+          "name": "12",
+          "count": 146
+        },
+        {
+          "name": "14+",
+          "count": 48
+        },
+        {
+          "name": "11+",
+          "count": 46
+        },
+        {
+          "name": "11",
+          "count": 25
+        },
+        {
+          "name": "10+",
+          "count": 6
+        }
+      ],
+      "designers": [
+        {
+          "name": "はっぴー",
+          "count": 272
+        },
+        {
+          "name": "Jack",
+          "count": 131
+        },
+        {
+          "name": "サファ太",
+          "count": 104
+        },
+        {
+          "name": "mai-Star",
+          "count": 63
+        },
+        {
+          "name": "小鳥遊さん",
+          "count": 59
+        },
+        {
+          "name": "某S氏",
+          "count": 55
+        },
+        {
+          "name": "Luxizhel",
+          "count": 53
+        },
+        {
+          "name": "ニャイン",
+          "count": 49
+        },
+        {
+          "name": "ロシェ@ペンギン",
+          "count": 47
+        },
+        {
+          "name": "緑風 犬三郎",
+          "count": 43
+        },
+        {
+          "name": "シチミヘルツ",
+          "count": 41
+        },
+        {
+          "name": "ぴちネコ",
+          "count": 38
+        }
+      ]
+    },
+    "Re:Master": {
+      "chartCount": 148,
+      "songCount": 148,
+      "levels": [
+        {
+          "name": "13",
+          "count": 49
+        },
+        {
+          "name": "13+",
+          "count": 36
+        },
+        {
+          "name": "14",
+          "count": 31
+        },
+        {
+          "name": "12+",
+          "count": 17
+        },
+        {
+          "name": "14+",
+          "count": 8
+        },
+        {
+          "name": "12",
+          "count": 4
+        },
+        {
+          "name": "15",
+          "count": 3
+        }
+      ],
+      "designers": [
+        {
+          "name": "はっぴー",
+          "count": 28
+        },
+        {
+          "name": "Jack",
+          "count": 16
+        },
+        {
+          "name": "サファ太",
+          "count": 14
+        },
+        {
+          "name": "某S氏",
+          "count": 8
+        },
+        {
+          "name": "玉子豆腐",
+          "count": 7
+        },
+        {
+          "name": "Luxizhel",
+          "count": 6
+        },
+        {
+          "name": "ぴちネコ",
+          "count": 6
+        },
+        {
+          "name": "シチミヘルツ",
+          "count": 4
+        },
+        {
+          "name": "チャン@DP皆伝",
+          "count": 4
+        },
+        {
+          "name": "小鳥遊さん",
+          "count": 4
+        },
+        {
+          "name": "華火職人",
+          "count": 4
+        },
+        {
+          "name": "rioN",
+          "count": 3
+        }
+      ]
+    }
+  }
+}

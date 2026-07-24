@@ -11,6 +11,13 @@ const songsPath = firstExisting([
   path.join(root, "src/data/importedSongs.json")
 ]);
 const youtubePath = path.join(root, "src/data/youtubeSources.json");
+const precomputedPaths = [
+  "public/data/catalogMeta.json",
+  "public/data/filterIndex.json",
+  "public/data/presetPools.json",
+  "public/data/drawCache.json",
+  "public/data/siteReport.json"
+].map((item) => path.join(root, item));
 const songs = JSON.parse(fs.readFileSync(songsPath, "utf8"));
 const youtubeSources = JSON.parse(fs.readFileSync(youtubePath, "utf8"));
 const difficulties = new Set(["Basic", "Advanced", "Expert", "Master", "Re:Master"]);
@@ -21,6 +28,7 @@ const chartPools = new Map();
 let chartCount = 0;
 let missingJackets = 0;
 let missingPreviews = 0;
+let emptyJackets = 0;
 
 if (!Array.isArray(songs) || songs.length < 48) {
   errors.push(`曲库至少需要 48 首，当前为 ${Array.isArray(songs) ? songs.length : "非数组"}`);
@@ -44,6 +52,7 @@ for (const [songIndex, song] of songs.entries()) {
   }
 
   if (!assetExists(song.jacket)) missingJackets += 1;
+  else if (isEmptyLocalAsset(song.jacket)) emptyJackets += 1;
   if (song.previewAudio && !assetExists(song.previewAudio)) missingPreviews += 1;
 
   const chartKeys = new Set();
@@ -92,11 +101,29 @@ if (missingPreviews) {
   const message = `${missingPreviews}/${referenced} 个已引用试听文件未部署`;
   (requireAssets ? errors : warnings).push(message);
 }
+if (emptyJackets) {
+  warnings.push(`${emptyJackets} 张封面文件为空，前端会回落占位图`);
+}
+
+for (const precomputedPath of precomputedPaths) {
+  if (!fs.existsSync(precomputedPath)) {
+    warnings.push(`缺少预计算文件：${path.relative(root, precomputedPath)}，运行 npm run data:precompute`);
+  }
+}
+
+const siteReportPath = path.join(root, "public/data/siteReport.json");
+if (fs.existsSync(siteReportPath)) {
+  const siteReport = JSON.parse(fs.readFileSync(siteReportPath, "utf8"));
+  if (siteReport.status !== "ok") {
+    warnings.push(`站点报告状态：${siteReport.status}`);
+  }
+  for (const warning of siteReport.warnings || []) warnings.push(`站点报告：${warning}`);
+}
 
 console.log(`曲库：${songs.length} 首 / ${chartCount} 张谱面`);
 console.log(`谱面池：${[...chartPools.entries()].map(([name, count]) => `${name} ${count}`).join(" · ")}`);
 console.log(`YouTube 映射：${Object.keys(youtubeSources).length} 首`);
-console.log(`本地资源：缺封面 ${missingJackets} · 缺已引用试听 ${missingPreviews}`);
+console.log(`本地资源：缺封面 ${missingJackets} · 空封面 ${emptyJackets} · 缺已引用试听 ${missingPreviews}`);
 for (const warning of warnings) console.warn(`WARN ${warning}`);
 for (const error of errors) console.error(`ERROR ${error}`);
 
@@ -120,6 +147,15 @@ function assetExists(webPath) {
   if (/^https?:\/\//i.test(webPath)) return true;
   const relative = webPath.replace(/^\/+/, "");
   return assetRoots.some((assetRoot) => fs.existsSync(path.join(assetRoot, relative)));
+}
+
+function isEmptyLocalAsset(webPath) {
+  if (!nonEmpty(webPath) || /^https?:\/\//i.test(webPath)) return false;
+  const relative = webPath.replace(/^\/+/, "");
+  return assetRoots.some((assetRoot) => {
+    const file = path.join(assetRoot, relative);
+    return fs.existsSync(file) && fs.statSync(file).size === 0;
+  });
 }
 
 function firstExisting(paths) {

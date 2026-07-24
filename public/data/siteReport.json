@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-24T08:17:57.594Z",
+  "status": "ok",
+  "summary": {
+    "songs": 1587,
+    "charts": 6253,
+    "presets": 10,
+    "playablePresets": 10
+  },
+  "warnings": [],
+  "checks": {
+    "duplicateSongIds": [],
+    "missingJackets": [],
+    "missingPreviews": [],
+    "missingConstants": []
+  },
+  "presets": [
+    {
+      "id": "song-all",
+      "title": "全曲本命杯",
+      "uniqueSongCount": 1587,
+      "playable": true
+    },
+    {
+      "id": "song-original",
+      "title": "maimai 原创杯",
+      "uniqueSongCount": 418,
+      "playable": true
+    },
+    {
+      "id": "song-vocaloid",
+      "title": "nico/V 家杯",
+      "uniqueSongCount": 395,
+      "playable": true
+    },
+    {
+      "id": "song-toho",
+      "title": "东方 Project 杯",
+      "uniqueSongCount": 163,
+      "playable": true
+    },
+    {
+      "id": "chart-exp-12",
+      "title": "红谱主战场",
+      "uniqueSongCount": 326,
+      "playable": true
+    },
+    {
+      "id": "chart-master-13",
+      "title": "紫谱本命战",
+      "uniqueSongCount": 805,
+      "playable": true
+    },
+    {
+      "id": "chart-master-14",
+      "title": "紫谱神仙杯",
+      "uniqueSongCount": 270,
+      "playable": true
+    },
+    {
+      "id": "chart-remaster",
+      "title": "白谱精英杯",
+      "uniqueSongCount": 124,
+      "playable": true
+    },
+    {
+      "id": "new-era",
+      "title": "近代新曲杯",
+      "uniqueSongCount": 471,
+      "playable": true
+    },
+    {
+      "id": "classic",
+      "title": "怀旧街机杯",
+      "uniqueSongCount": 573,
+      "playable": true
+    }
+  ]
+}

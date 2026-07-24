@@ -9,11 +9,16 @@
     "candidates:generate": "node scripts/generate-youtube-candidates.mjs",
     "game:scan": "node scripts/scan-game-files.mjs",
     "jp-assets:extract": "python3 scripts/extract_jp_assets.py",
+    "jp-assets:thumbs": "python3 scripts/generate_jacket_thumbnails.py",
     "songs:import-jp-package": "python3 scripts/import_jp_package.py",
+    "data:precompute": "node scripts/precompute-site-data.mjs",
+    "deploy:prepare": "npm run data:precompute && npm run jp-assets:thumbs",
+    "deploy:prewarm": "node scripts/prewarm-cloudflare.mjs",
     "release:check": "node scripts/validate-release.mjs",
     "release:check:assets": "node scripts/validate-release.mjs --require-assets",
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
+    "build:app": "tsc -b && vite build",
+    "build": "npm run data:precompute && npm run build:app",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {

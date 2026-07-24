@@ -1,0 +1,348 @@
+/* ============================================================
+   夜樱 / NIGHT SAKURA — 配色重做
+   设计思路：
+   1. 中性色全部往「梅紫」暖调走，不用灰蓝 —— 冷灰是「脏」的根源。
+   2. 建立 4 级明确的表面层次（页面底 / 面板 / 卡片 / 浮起），
+      每级之间有肉眼可辨的明度台阶，不再糊成一片。
+   3. 主强调只有樱粉一个，金色作次强调（冠军/胜者），
+      青绿只作极少量点缀（收藏、进度），避免单色疲劳。
+   4. 曲绘是画面主角 —— 外围 chrome 保持安静但「有色」，
+      靠层次和微光支撑，而不是靠加饱和度抢戏。
+   ============================================================ */
+
+:root {
+  /* —— 表面层次（暖梅紫，非灰蓝）—— */
+  --s0: #100710; /* 页面最底 */
+  --s1: #1a0d1a; /* 面板 */
+  --s2: #241426; /* 卡片 */
+  --s3: #2f1c32; /* 浮起 / hover */
+
+  /* —— 描边：带粉调，不用纯白透明 —— */
+  --line: rgba(255, 176, 209, 0.13);
+  --line-strong: rgba(255, 176, 209, 0.26);
+
+  /* —— 文字 —— */
+  --ink: #fff2f8;
+  --ink-2: #d5b3c7;
+  --text-muted: #9d8195;
+
+  /* —— 强调 —— */
+  --sakura: #ff7cad; /* 主：比原来更饱和，才有霓虹感 */
+  --sakura-hi: #ffa6c9;
+  --sakura-deep: #e63f7d;
+  --gold: #ffc24d; /* 次：冠军 / 胜者 */
+  --mint: #4fe0c4; /* 点缀：收藏 / 进度，用量极少 */
+
+  --grad-primary: linear-gradient(135deg, #ff9ac2 0%, #ff5f9c 55%, #e63f7d 100%);
+  --shadow: 0 22px 60px rgba(8, 2, 8, 0.62);
+  --glow-sakura: 0 0 24px rgba(255, 124, 173, 0.34);
+
+  /* 兼容旧变量名 */
+  --bg: var(--s0);
+  --panel: var(--s1);
+  --panel-strong: var(--s2);
+  --cyan: var(--sakura);
+  --pink: var(--sakura-deep);
+  --yellow: var(--gold);
+  --sakura-soft: #ffd9e8;
+  color: var(--ink);
+  background: var(--s0);
+}
+
+/* —— 页面底：暖梅紫 + 顶部一束樱光，去掉冷蓝 —— */
+body {
+  background:
+    radial-gradient(1000px 520px at 50% -14%, rgba(255, 124, 173, 0.16), transparent 66%),
+    radial-gradient(760px 460px at 92% 6%, rgba(180, 108, 255, 0.09), transparent 62%),
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(168deg, #150818 0%, #100710 52%, #0b050c 100%);
+  background-size: auto, auto, 38px 38px, 38px 38px, cover;
+  background-attachment: fixed;
+  color: var(--ink);
+}
+
+/* —— 面板：明确高于页面底，顶部一条樱色高光（街机面板感）—— */
+.app-shell .control-surface,
+.app-shell .stage,
+.app-shell .result-panel,
+.app-shell .admin-console {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #211125 0%, var(--s1) 62%);
+  box-shadow: var(--shadow);
+}
+
+.app-shell .control-surface::before,
+.app-shell .stage::before,
+.app-shell .admin-console::before {
+  position: absolute;
+  top: 0;
+  right: 22px;
+  left: 22px;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 124, 173, 0.55), rgba(255, 194, 77, 0.3), transparent);
+  opacity: 1;
+  animation: none;
+  transform: none;
+}
+
+/* —— 卡片：再高一级，曲绘周围留出暖色底 —— */
+.app-shell .song-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2a1730 0%, var(--s2) 70%);
+  box-shadow: 0 12px 30px rgba(8, 2, 8, 0.42);
+}
+
+.app-shell .song-card.clickable:hover {
+  border-color: var(--line-strong);
+  background: linear-gradient(180deg, #351d3b 0%, var(--s3) 70%);
+  box-shadow: 0 18px 42px rgba(8, 2, 8, 0.5), var(--glow-sakura);
+}
+
+.app-shell .song-card.selected {
+  border-color: var(--sakura);
+  background: linear-gradient(180deg, #3a1e35 0%, #2a1528 70%);
+  box-shadow: 0 0 0 1px var(--sakura), 0 16px 40px rgba(230, 63, 125, 0.24);
+}
+
+/* —— 文字层级 —— */
+.app-shell .title-line {
+  color: var(--ink);
+}
+.app-shell .artist-line,
+.app-shell .stage-header p {
+  color: var(--ink-2);
+}
+.app-shell .filter-title,
+.app-shell .seed-field,
+.app-shell .range-grid label {
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+/* —— 主按钮：樱粉渐变 + 微光 —— */
+.app-shell .primary-action,
+.app-shell .primary-inline {
+  border: 0;
+  color: #2b0616;
+  background: var(--grad-primary);
+  box-shadow: 0 6px 18px rgba(230, 63, 125, 0.36), var(--glow-sakura);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.app-shell .primary-action:not(:disabled):hover,
+.app-shell .primary-inline:not(:disabled):hover {
+  box-shadow: 0 10px 26px rgba(230, 63, 125, 0.46), 0 0 30px rgba(255, 124, 173, 0.45);
+}
+
+.app-shell .ghost-action {
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  background: rgba(255, 124, 173, 0.07);
+}
+.app-shell .ghost-action:not(:disabled):hover {
+  border-color: var(--sakura);
+  background: rgba(255, 124, 173, 0.14);
+}
+
+/* —— 模式切换：选中态强对比，未选中态安静 —— */
+.app-shell .mode-toggle {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(10, 4, 10, 0.45);
+}
+.app-shell .mode-toggle button {
+  border: 0;
+  border-radius: 11px;
+  color: var(--text-muted);
+  background: transparent;
+}
+.app-shell .mode-toggle button.active {
+  color: #2b0616;
+  background: var(--grad-primary);
+  box-shadow: 0 4px 14px rgba(230, 63, 125, 0.35);
+}
+
+/* —— chip：默认更安静，选中才亮 —— */
+.app-shell .chip {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink-2);
+  background: rgba(255, 255, 255, 0.028);
+}
+.app-shell .chip:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: rgba(255, 124, 173, 0.09);
+}
+.app-shell .chip.active {
+  border-color: transparent;
+  color: #2b0616;
+  background: var(--grad-primary);
+  box-shadow: 0 3px 12px rgba(230, 63, 125, 0.32);
+}
+
+/* —— 步骤条：三态清晰（已完成 / 当前 / 未到）—— */
+.app-shell .cup-stepper > div {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.022);
+}
+.app-shell .cup-stepper .done {
+  border-color: rgba(255, 194, 77, 0.34);
+  color: var(--gold);
+  background: rgba(255, 194, 77, 0.08);
+}
+.app-shell .cup-stepper .current {
+  border-color: var(--sakura);
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(255, 124, 173, 0.2), rgba(255, 124, 173, 0.06));
+  box-shadow: var(--glow-sakura);
+}
+
+/* —— 预设卡：可点，给它「卡片」该有的质感 —— */
+.app-shell .preset-card,
+.app-shell .rule-code-box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #26142a 0%, #1d1020 100%);
+}
+.app-shell .preset-card:hover {
+  border-color: var(--sakura);
+  background: linear-gradient(180deg, #331b37 0%, #24142a 100%);
+}
+
+/* —— 顶栏 —— */
+.app-shell .eyebrow {
+  color: var(--sakura);
+  letter-spacing: 0.34em;
+}
+.app-shell h1 {
+  background: linear-gradient(112deg, #fff4f9 8%, var(--sakura-hi) 48%, var(--sakura-deep) 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.app-shell .cup-context span,
+.app-shell .stage-meta {
+  border: 1px solid var(--line-strong);
+  color: var(--sakura-hi);
+  background: rgba(255, 124, 173, 0.1);
+}
+.app-shell .phase-badge {
+  border: 1px solid rgba(255, 194, 77, 0.42);
+  color: var(--gold);
+  background: rgba(255, 194, 77, 0.09);
+  box-shadow: 0 0 20px rgba(255, 194, 77, 0.16);
+}
+
+/* —— 表单 —— */
+.app-shell input,
+.app-shell select {
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  background: rgba(8, 3, 9, 0.55);
+}
+.app-shell input::placeholder {
+  color: #7a6070;
+}
+.app-shell input:focus,
+.app-shell select:focus {
+  border-color: var(--sakura);
+  box-shadow: 0 0 0 3px rgba(255, 124, 173, 0.18);
+}
+
+/* —— 试听：青绿点缀，全站唯一用到冷色的地方 —— */
+.app-shell .audio-preview {
+  border: 1px solid rgba(79, 224, 196, 0.22);
+  border-radius: 10px;
+  background: rgba(79, 224, 196, 0.06);
+}
+.app-shell .audio-preview button {
+  color: var(--mint);
+  background: transparent;
+  border: 0;
+  font-weight: 800;
+}
+.app-shell .audio-preview.is-playing {
+  border-color: rgba(79, 224, 196, 0.5);
+  background: rgba(79, 224, 196, 0.12);
+  box-shadow: 0 0 18px rgba(79, 224, 196, 0.18);
+}
+
+/* —— 进度条 —— */
+.app-shell .progress-shell {
+  border: 1px solid var(--line);
+  background: rgba(8, 3, 9, 0.6);
+}
+.app-shell .progress-shell span {
+  background: linear-gradient(90deg, var(--sakura-hi), var(--sakura-deep), var(--gold));
+}
+
+/* —— 提示条 —— */
+.app-shell .filter-hint,
+.app-shell .subtle-hint {
+  border-left: 3px solid var(--sakura);
+  border-radius: 0 10px 10px 0;
+  color: #ffdcec;
+  background: linear-gradient(90deg, rgba(255, 124, 173, 0.13), rgba(255, 124, 173, 0.03));
+}
+
+/* —— VS —— */
+.app-shell .vs-badge {
+  border: 2px solid rgba(255, 194, 77, 0.85);
+  color: #2b0616;
+  background: radial-gradient(circle, #fff 0%, var(--sakura-hi) 42%, var(--sakura-deep) 100%);
+  box-shadow: 0 0 26px rgba(230, 63, 125, 0.55), 0 0 52px rgba(255, 124, 173, 0.3);
+}
+
+/* —— 难度色：语义色，保持 maimai 原样，只压一点亮度让它融进暗底 —— */
+.app-shell .difficulty.basic {
+  background: #52c95a;
+  color: #06180a;
+}
+.app-shell .difficulty.advanced {
+  background: #e8c247;
+  color: #1d1503;
+}
+.app-shell .difficulty.expert {
+  background: #f1526a;
+  color: #22040a;
+}
+.app-shell .difficulty.master {
+  background: #a25cf0;
+  color: #fff;
+}
+.app-shell .difficulty.remaster {
+  background: linear-gradient(135deg, #fff, #ffc9e6);
+  color: #3a0a1c;
+}
+
+/* —— 分享海报：金色作冠军主调，樱粉作场景光 —— */
+.app-shell .share-poster {
+  border: 1px solid rgba(255, 194, 77, 0.2);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 124, 173, 0.2), transparent 30%),
+    radial-gradient(circle at 50% 24%, rgba(255, 194, 77, 0.13), transparent 34%),
+    linear-gradient(180deg, #22112400 0%, #150a17 100%),
+    linear-gradient(180deg, #1e1022 0%, #0d060f 100%);
+}
+.app-shell .poster-match.champion-line {
+  border-color: rgba(255, 194, 77, 0.72);
+  box-shadow: 0 0 16px rgba(255, 194, 77, 0.24);
+}
+.app-shell .champion-art {
+  border: 2px solid rgba(255, 194, 77, 0.75);
+  box-shadow: 0 0 40px rgba(255, 194, 77, 0.26), 0 20px 60px rgba(8, 2, 8, 0.5);
+}
+.app-shell .champion-ribbon {
+  color: #2b0616;
+  background: linear-gradient(135deg, var(--gold), var(--sakura-hi));
+}

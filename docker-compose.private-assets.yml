@@ -2,4 +2,5 @@ services:
   maimai-music-cup:
     volumes:
       - ${MMC_PRIVATE_ASSET_ROOT:-./deploy/private-assets}/assets/jackets/jp-db:/usr/share/nginx/html/assets/jackets/jp-db:ro
+      - ${MMC_PRIVATE_ASSET_ROOT:-./deploy/private-assets}/assets/jackets-sm/jp-db:/usr/share/nginx/html/assets/jackets-sm/jp-db:ro
       - ${MMC_PRIVATE_ASSET_ROOT:-./deploy/private-assets}/assets/previews/jp-db:/usr/share/nginx/html/assets/previews/jp-db:ro

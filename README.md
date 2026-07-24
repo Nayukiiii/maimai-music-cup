@@ -42,7 +42,30 @@ http://localhost:5173
 npm run build
 ```
 
-构建产物会输出到 `dist/`。这是纯静态文件，可以由 Nginx、Caddy、对象存储或任意静态服务托管。
+构建会先运行 `npm run data:precompute`，把曲库的筛选索引、预设池统计、站点报告和固定种子抽签样例生成到 `public/data/`，再输出静态产物到 `dist/`。这是纯静态文件，可以由 Nginx、Caddy、对象存储或任意静态服务托管。
+
+生产部署前推荐额外跑一次：
+
+```bash
+python3 -m pip install -U Pillow
+npm run deploy:prepare
+```
+
+`deploy:prepare` 会生成：
+
+- `public/data/catalogMeta.json`：分类、版本、难度、等级、定数范围和谱面统计。
+- `public/data/filterIndex.json`：前端筛选索引，减少浏览器首屏计算。
+- `public/data/presetPools.json`：赛事预设可用数量，用于配置页直接展示。
+- `public/data/drawCache.json`：常用预设和固定种子的抽签缓存，便于快速验收。
+- `public/data/siteReport.json`：发布前数据质量报告。
+- `deploy/private-assets/assets/jackets-sm/jp-db/`：从私有封面生成的 192px 缩略图。
+
+如果部署机没有 Node/npm，可以用 Docker 跑预计算；缩略图仍建议在宿主机跑，因为它依赖本地 Python 和 Pillow：
+
+```bash
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/app" -w /app node:20-alpine npm run data:precompute
+python3 scripts/generate_jacket_thumbnails.py
+```
 
 ## 曲库与资源
 
@@ -297,6 +320,7 @@ deploy/private-assets/
 
 ```text
 deploy/private-assets/assets/jackets/jp-db/
+deploy/private-assets/assets/jackets-sm/jp-db/
 deploy/private-assets/assets/previews/jp-db/
 ```
 
@@ -304,7 +328,10 @@ deploy/private-assets/assets/previews/jp-db/
 
 ```bash
 mkdir -p deploy/private-assets/assets/jackets/jp-db
+mkdir -p deploy/private-assets/assets/jackets-sm/jp-db
 mkdir -p deploy/private-assets/assets/previews/jp-db
+npm run deploy:prepare
+chmod -R a+rX deploy/private-assets
 npm run release:check:assets
 docker compose -f docker-compose.yml -f docker-compose.private-assets.yml up -d --build
 ```
@@ -365,6 +392,9 @@ mkdir -p deploy
 docker run --rm -it -v "$PWD/deploy:/work" httpd:2.4-alpine \
   htpasswd -cB /work/.htpasswd admin
 chmod 644 deploy/.htpasswd
+npm run deploy:prepare
+chmod -R a+rX deploy/private-assets
+npm run release:check:assets
 docker compose up -d --build
 docker compose ps
 curl -fsS http://127.0.0.1:18080/healthz
@@ -401,12 +431,33 @@ server {
 
 然后用 Certbot 或 Caddy 自动签 HTTPS 证书即可。
 
+6. Cloudflare 推荐缓存
+
+如果域名接入 Cloudflare，建议建立三条 Cache Rules：
+
+- `/admin*`：绕过缓存，避免管理页和 Basic Auth 被边缘缓存干扰。
+- `/data/*.json`：缓存 1 小时左右，换曲库或预计算数据后手动 Purge。
+- `/assets/*`：缓存 30 天或更久，封面和试听文件名稳定时首访后会明显更快。
+
+部署完成后可以预热首页、数据文件、当前构建 JS/CSS、前 24 首封面缩略图和试听：
+
+```bash
+SITE_URL=https://maimai.utautai.org npm run deploy:prewarm
+```
+
+预热脚本默认尽力执行，少量坏链只打印 warning；需要 CI 严格失败时加 `-- --strict`。
+
 ## 项目结构
 
 ```text
 maimai-music-cup/
   public/
     data/importedSongs.json
+    data/catalogMeta.json
+    data/filterIndex.json
+    data/presetPools.json
+    data/drawCache.json
+    data/siteReport.json
   src/
     admin/AdminApp.tsx
     admin/YouTubeAdmin.tsx
@@ -419,7 +470,11 @@ maimai-music-cup/
     admin-polish.css
     main.tsx
     styles.css
+    theme-sakura.css
   scripts/generate-youtube-candidates.mjs
+  scripts/generate_jacket_thumbnails.py
+  scripts/precompute-site-data.mjs
+  scripts/prewarm-cloudflare.mjs
   Dockerfile
   nginx.conf
   docker-compose.yml

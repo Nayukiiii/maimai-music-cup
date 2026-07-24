@@ -24,6 +24,7 @@ import type { ReactNode, RefObject, SyntheticEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SongCard } from "./components/SongCard";
 import { loadSongCatalog } from "./data/songs";
+import type { CatalogMeta, PresetPools, SiteReport } from "./data/songs";
 import { compareLevel, getRoundName, makeGroups, shuffleWithSeed, toCupEntries } from "./lib/tournament";
 import { CupEntry, CupFilters, Difficulty, MatchRecord, Song } from "./types";
 
@@ -180,6 +181,9 @@ export default function App() {
   const [drawError, setDrawError] = useState("");
   const [captureState, setCaptureState] = useState<CaptureState>("idle");
   const [catalogSongs, setCatalogSongs] = useState<Song[]>([]);
+  const [catalogMeta, setCatalogMeta] = useState<CatalogMeta | null>(null);
+  const [presetPools, setPresetPools] = useState<PresetPools | null>(null);
+  const [siteReport, setSiteReport] = useState<SiteReport | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogUsingImported, setCatalogUsingImported] = useState(false);
   const [catalogError, setCatalogError] = useState("");
@@ -197,6 +201,9 @@ export default function App() {
     loadSongCatalog().then((catalog) => {
       if (cancelled) return;
       setCatalogSongs(catalog.songs);
+      setCatalogMeta(catalog.meta ?? null);
+      setPresetPools(catalog.presetPools ?? null);
+      setSiteReport(catalog.siteReport ?? null);
       setCatalogUsingImported(catalog.usingImportedSongs);
       setCatalogError(catalog.error || "");
       setCatalogLoading(false);
@@ -208,16 +215,17 @@ export default function App() {
 
   const songs = catalogSongs;
   const usingImportedSongs = catalogUsingImported;
-  const categories = useMemo(() => unique(songs.map((song) => song.category)), [songs]);
-  const versions = useMemo(() => unique(songs.map((song) => song.version)), [songs]);
+  const categories = useMemo(() => catalogMeta?.categories.map((item) => item.name) ?? unique(songs.map((song) => song.category)), [catalogMeta, songs]);
+  const versions = useMemo(() => catalogMeta?.versions.map((item) => item.name) ?? unique(songs.map((song) => song.version)), [catalogMeta, songs]);
   const levelOptions = useMemo(
-    () => unique(songs.flatMap((song) => song.charts.map((chart) => chart.level))).sort(compareLevel),
-    [songs]
+    () => catalogMeta?.levels ?? unique(songs.flatMap((song) => song.charts.map((chart) => chart.level))).sort(compareLevel),
+    [catalogMeta, songs]
   );
   const constantBounds = useMemo(() => {
+    if (catalogMeta?.constantBounds) return catalogMeta.constantBounds;
     const values = songs.flatMap((song) => song.charts.map((chart) => chart.constant)).filter(isNumber);
     return values.length ? { min: Math.min(...values), max: Math.max(...values) } : null;
-  }, [songs]);
+  }, [catalogMeta, songs]);
   useEffect(() => {
     if (!levelOptions.length) return;
     const first = levelOptions[0];
@@ -282,14 +290,17 @@ export default function App() {
     () =>
       rulePresets.map((preset) => {
         const presetFilters = buildPresetFilters(preset, readSeed(), categories, versions);
-        const entries = toCupEntries(songs, presetFilters).filter((entry) => !excludedSongIds.includes(entry.songId));
+        const precomputed = presetPools?.presets.find((item) => item.id === preset.id);
+        const entries = precomputed && excludedSongIds.length === 0
+          ? []
+          : toCupEntries(songs, presetFilters).filter((entry) => !excludedSongIds.includes(entry.songId));
         return {
           preset,
-          count: new Set(entries.map((entry) => entry.songId)).size,
+          count: precomputed && excludedSongIds.length === 0 ? precomputed.uniqueSongCount : new Set(entries.map((entry) => entry.songId)).size,
           filters: presetFilters
         };
       }),
-    [songs, categories, versions, excludedSongIds, seedDraft]
+    [songs, categories, versions, presetPools, excludedSongIds, seedDraft]
   );
 
   useEffect(() => {
@@ -696,6 +707,7 @@ export default function App() {
                   : "谱面杯：以「歌 + 单一难度谱面」参赛，整届固定同难度对决。"}
             </p>
             {catalogError ? <p className="filter-hint subtle-hint">真实曲库读取失败，已临时使用 Mock 曲库：{catalogError}</p> : null}
+            {siteReport?.warnings?.length ? <p className="filter-hint subtle-hint">站点报告：{siteReport.warnings[0]}</p> : null}
 
             <div className="rule-code-strip">
               <span>规则码</span>

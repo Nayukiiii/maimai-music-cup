@@ -36,6 +36,7 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
   const chartType = entry.chart?.type;
   const chartTypeLabel = entry.chart ? getChartTypeLabel(chartType, entry.songId) : "";
   const showBpm = Boolean(entry.bpm) && entry.bpm > 0;
+  const jacketSrc = mode === "duel" ? entry.jacket : entry.jacketThumb ?? entry.jacket;
 
   useEffect(() => {
     setAudioFailed(false);
@@ -83,7 +84,8 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
     >
       <span className="jacket-wrap">
         <img
-          src={entry.jacket}
+          src={jacketSrc}
+          data-full-src={entry.jacket}
           alt={`${entry.title} jacket`}
           className="jacket"
           loading="lazy"
@@ -166,6 +168,12 @@ export function SongCard({ entry, mode = "normal", selected, disabled, rankLabel
 
 function useFallbackJacket(event: SyntheticEvent<HTMLImageElement>) {
   const image = event.currentTarget;
+  const fullSrc = image.dataset.fullSrc;
+  if (fullSrc && image.src !== new URL(fullSrc, window.location.href).toString()) {
+    image.src = fullSrc;
+    delete image.dataset.fullSrc;
+    return;
+  }
   if (!image.src.endsWith("/assets/jacket-fallback.svg")) {
     image.src = "/assets/jacket-fallback.svg";
   }

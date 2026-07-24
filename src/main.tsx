@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 import "./tournament-polish.css";
+// 配色重做层，必须最后加载。若确定采用，应折进 styles.css 而不是长期保留为第 3 层。
+import "./theme-sakura.css";
 
 // YouTube 音源映射 Admin 已停用：试听改为直接使用服务器本地 mp3
 // (public/assets/previews/)，曲库 1587 首已全部挂好 previewAudio，

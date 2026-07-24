@@ -20,6 +20,7 @@ export interface Song {
   version: string;
   versionId?: number | null;
   jacket: string;
+  jacketThumb?: string;
   previewAudio?: string;
   bpm: number;
   chartType?: "standard" | "dx";
@@ -47,6 +48,7 @@ export interface CupEntry {
   category: string;
   version: string;
   jacket: string;
+  jacketThumb?: string;
   previewAudio?: string;
   bpm: number;
   chart?: Chart;
